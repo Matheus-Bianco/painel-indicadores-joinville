@@ -483,6 +483,7 @@ function sectionBanner(icon, title, subtitle, opts = {}) {
             <label class="banner-filter-label">Ano</label>
             <select id="sel-ano" class="banner-filter-select"></select>
           </div>
+          ${JV_MODE ? '' : `
           <div class="banner-filter-group">
             <label class="banner-filter-label">CRE</label>
             <select id="sel-cre" class="banner-filter-select">
@@ -498,7 +499,7 @@ function sectionBanner(icon, title, subtitle, opts = {}) {
             <select id="sel-mun" class="banner-filter-select" style="display:none">
               <option value="">Todos</option>
             </select>
-          </div>
+          </div>`}
         </div>
         <div style="font-size:9px;color:rgba(255,255,255,.6);text-align:right;font-weight:500;letter-spacing:.3px;padding-right:4px;">
           💡 Dica: Ajuste o zoom do painel<br>(Ctrl - ou Ctrl +) para sua preferência
@@ -2217,7 +2218,8 @@ function renderInfra() {
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="chart-card" style="padding:0;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,90,50,.04);border-bottom:1px solid rgba(0,90,50,.08);flex-wrap:wrap;gap:6px">
-          <span style="font-weight:600;font-size:12px;color:#333">Mapa — ${anoAtual}</span>
+          <span style="font-weight:600;font-size:12px;color:#333">Mapa de Escolas — ${anoAtual}</span>
+          ${JV_MODE ? '' : `
           <div class="map-layer-toggle">
             <button class="map-layer-btn active" id="btn-infra-layer-mun">Municípios</button>
             <button class="map-layer-btn" id="btn-infra-layer-cre">CREs</button>
@@ -2239,7 +2241,7 @@ function renderInfra() {
             <option value="IN_SALA_DIRETORIA">Sala Diretoria</option>
             <option value="IN_SALA_PROFESSOR">Sala Professor</option>
             <option value="IN_CLIMATIZACAO">Ar Condicionado</option>
-          </select>
+          </select>`}
         </div>
         <div id="infra-map" style="height:480px;width:100%"></div>
       </div>
@@ -2271,9 +2273,9 @@ function renderInfra() {
   buildInfraKPIs(infra, anoAtual, anos);
   buildInfraChart(infra, anoAtual, 'Tecnologia');
   bindInfraCatTabs(infra, anoAtual);
-  buildInfraMunTable(infra);
+  if (!JV_MODE) buildInfraMunTable(infra);
   buildInfraMap(infra, 'IN_INTERNET');
-  bindInfraMapMetric(infra);
+  if (!JV_MODE) bindInfraMapMetric(infra);
 
   // Populate dropdowns (infra has limited years)
   const selAno = document.getElementById('sel-ano');
@@ -2774,7 +2776,15 @@ function buildInfraMap(infra, metricKey) {
   
   const map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: true, attributionControl: false }).setView(MAP_VIEW.center, MAP_VIEW.zoom);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 14 }).addTo(map);
-  
+  S.map = map;
+
+  // Joinville: recorte municipal único — mapa de pontos por escola (sem coropleto)
+  if (JV_MODE) {
+    addJoinvilleContour();
+    buildInfraEscolaLayer(infra);
+    return;
+  }
+
   const munData = infra.por_municipio?.['2024'] || {};
   const lookup = S.data?.lookup_municipios || {};
   const label = infra.labels?.[metricKey] || metricKey;
@@ -3016,19 +3026,20 @@ function renderDocencia() {
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="chart-card" style="padding:0;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,90,50,.04);border-bottom:1px solid rgba(0,90,50,.08)">
-          <span style="font-weight:600;font-size:12px;color:#333">Mapa — Docentes por Município</span>
+          <span style="font-weight:600;font-size:12px;color:#333">${JV_MODE ? 'Mapa — Docentes por Escola' : 'Mapa — Docentes por Município'}</span>
+          ${JV_MODE ? '' : `
           <div class="map-layer-toggle">
             <button class="map-layer-btn active" id="doc-btn-layer-mun">Municípios</button>
             <button class="map-layer-btn" id="doc-btn-layer-cre">CREs</button>
             <button class="map-layer-btn" id="doc-btn-layer-esc">Escolas</button>
-          </div>
+          </div>`}
         </div>
         <div id="doc-map" style="height:400px;width:100%"></div>
       </div>
       <div class="chart-card">
         <div class="table-header">
-          <h3>Docentes por Município — 2025</h3>
-          <input type="text" class="table-search" id="doc-mun-search" placeholder="Buscar município...">
+          <h3>${JV_MODE ? 'Docentes por Escola — 2025' : 'Docentes por Município — 2025'}</h3>
+          <input type="text" class="table-search" id="doc-mun-search" placeholder="${JV_MODE ? 'Buscar escola...' : 'Buscar município...'}">
         </div>
         <div style="font-size:10px;color:var(--accent);padding:4px 12px 6px;font-weight:600;background:rgba(255,203,4,.08);border-radius:0 0 6px 6px;border-top:1px dashed rgba(255,203,4,.3)">
           📍 Clique em qualquer município — na tabela ou no mapa — para filtrar <strong>todas as visualizações</strong> desta seção (KPIs, gráficos e recortes). Clique novamente para desfiltrar.
@@ -3047,8 +3058,12 @@ function renderDocencia() {
   `;
 
   buildDocCharts(doc);
-  buildDocMap(doc);
-  buildDocMunTable(doc);
+  if (JV_MODE) {
+    buildDocEscolaLayer(doc);
+  } else {
+    buildDocMap(doc);
+    buildDocMunTable(doc);
+  }
 
   // Populate dropdowns
   const anos = Object.keys(doc.serie_temporal_total || {}).sort();
@@ -3109,6 +3124,7 @@ function buildDocEscolaLayer(doc) {
   const lookup = S.data?.lookup_municipios || {};
 
   const markers = L.featureGroup();
+  addJoinvilleContour(markers);
   withCoords.forEach(e => {
     const dt = e.doc_total || 0;
     const r = dt > 100 ? 6 : dt > 50 ? 5 : dt > 20 ? 4 : 3;
@@ -4171,6 +4187,7 @@ function renderSaeb() {
 
   // ── SAEB Map + Municipality Table (if per-municipality data available) ──
   const saebBuildMunSection = () => {
+    if (JV_MODE) return; // Joinville: recorte municipal único — sem mapa/tabela por município
     const porMun = saeb.por_municipio || {};
     const anosComMun = Object.keys(porMun).sort();
     if (anosComMun.length === 0) return;
@@ -4857,6 +4874,7 @@ function renderIdeb() {
     </div>
     ` : ''}
 
+    ${JV_MODE ? '' : `
     <!-- ═══ EIXO: Distribuição Territorial ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/territorial.png" alt=""></span>
@@ -4903,7 +4921,7 @@ function renderIdeb() {
         </div>
         <div class="chart-source">${FONTE_IDEB}</div>
       </div>
-    </div>
+    </div>`}
   `;
 
   // ════════════════════════════════════════════════════════════════
@@ -5556,15 +5574,16 @@ function renderFluxo() {
     <div class="map-table-row d1">
       <div class="map-container">
         <div class="map-toolbar">
-          <h3>Mapa — ${anoSel}</h3>
+          <h3>${JV_MODE ? 'Mapa de Escolas — 2024' : `Mapa — ${anoSel}`}</h3>
           <select id="flx-map-metric">
             ${FLUXO_MAP_METRICS.filter(m => !JV_MODE || !m.key.endsWith('_med')).map(m => `<option value="${m.key}">${m.label}</option>`).join('')}
           </select>
+          ${JV_MODE ? '' : `
           <div class="map-layer-toggle">
             <button class="map-layer-btn active" id="flx-btn-layer-mun">Municípios</button>
             <button class="map-layer-btn" id="flx-btn-layer-cre">CREs</button>
             <button class="map-layer-btn" id="flx-btn-layer-esc">Escolas</button>
-          </div>
+          </div>`}
         </div>
         <div id="flx-map-leaflet" style="height:480px;width:100%;background:var(--bg)"></div>
       </div>
@@ -5629,10 +5648,16 @@ function renderFluxo() {
   fluxoUpdateKPIs(st, tdiSrc, f, anos, anoSel);
   // Build Charts — need to build per-year data source for time-series
   fluxoBuildCharts(f, anos, anoSel, st, tdiSrc);
-  // Build Map
-  buildFluxoMap(f, anoSel, 'aprov_fund');
-  // Build Table
-  fluxoBuildMunTable(f, anoSel, lookup);
+  // Build Map + Table
+  if (JV_MODE) {
+    // Joinville: recorte municipal único — apenas mapa de pontos + tabela por escola (dados 2024)
+    const mw = document.getElementById('flx-table-wrapper'); if (mw) mw.style.display = 'none';
+    const ew = document.getElementById('flx-escola-wrapper'); if (ew) ew.style.display = '';
+    fluxoBuildEscMap(f, anoSel, 'aprov_fund');
+  } else {
+    buildFluxoMap(f, anoSel, 'aprov_fund');
+    fluxoBuildMunTable(f, anoSel, lookup);
+  }
   // Bind map metric
   const selMetric = document.getElementById('flx-map-metric');
   const flxBtnMun = document.getElementById('flx-btn-layer-mun');
@@ -5643,6 +5668,7 @@ function renderFluxo() {
 
   if (selMetric) {
     selMetric.addEventListener('change', () => {
+      if (JV_MODE) { fluxoBuildEscMap(f, anoSel, selMetric.value); return; }
       if (flxBtnCre?.classList.contains('active')) buildFluxoCreMap(f, anoSel, selMetric.value);
       else if (flxBtnEsc?.classList.contains('active')) fluxoBuildEscMap(f, anoSel, selMetric.value);
       else buildFluxoMap(f, anoSel, selMetric.value);
@@ -6680,6 +6706,7 @@ function renderInse() {
 
 
 
+    ${JV_MODE ? '' : `
     <!-- ═══ EIXO: Mapa + Tabela ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_mapa.png" alt=""></span>
@@ -6722,11 +6749,11 @@ function renderInse() {
               </tr>
             </thead>
             <tbody></tbody>
-          </table>
+            </table>
         </div>
         <div class="chart-source">${FONTE_INSE}</div>
       </div>
-    </div>
+    </div>`}
   `;
 
   // ── Build KPIs ──
@@ -7583,17 +7610,18 @@ function renderIcg() {
       <div class="map-container">
         <div class="map-toolbar">
           <h3>Mapa — Nível Médio ICG <span id="icg-map-ano">${anoAtual}</span></h3>
+          ${JV_MODE ? '' : `
           <div class="map-layer-toggle">
             <button class="map-layer-btn active" id="icg-btn-layer-mun">Municípios</button>
             <button class="map-layer-btn" id="icg-btn-layer-cre">CREs</button>
             ${S.escolasData ? '<button class="map-layer-btn" id="icg-btn-layer-escola">Escolas</button>' : ''}
-          </div>
+          </div>`}
         </div>
         <div id="icg-map-leaflet" style="height:380px;border-radius:8px"></div>
       </div>
       <div class="table-wrapper" id="icg-table-wrapper">
         <div class="table-header">
-          <h3>Tabela de Municípios — ICG</h3>
+          <h3>${JV_MODE ? 'Tabela de Escolas — ICG' : 'Tabela de Municípios — ICG'}</h3>
           <input type="text" class="table-search" id="icg-mun-search" placeholder="Buscar...">
         </div>
         <div style="font-size:10px;color:var(--accent);padding:4px 12px 6px;font-weight:600;background:rgba(255,203,4,.08);border-radius:0 0 6px 6px;border-top:1px dashed rgba(255,203,4,.3)">
@@ -7807,6 +7835,9 @@ function renderIcg() {
       .setView(MAP_VIEW.center, MAP_VIEW.zoom);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 14 }).addTo(S.map);
 
+    // Joinville: recorte municipal único — mapa de pontos por escola (sem coropleto)
+    if (JV_MODE) { addJoinvilleContour(); icgBuildEscolaLayer(); return; }
+
     const info = L.control({ position: 'topright' });
     info.onAdd = function () { this._div = L.DomUtil.create('div', 'map-info-panel'); this.update(); return this._div; };
     info.update = function (props, md) {
@@ -7972,7 +8003,7 @@ function renderIcg() {
 
   // Build everything
   icgBuildMap();
-  icgBuildMunTable();
+  if (!JV_MODE) icgBuildMunTable();
   injectExportButtons();
 
   // Bind ICG map layer toggle
@@ -7999,7 +8030,7 @@ function renderIcg() {
   }
 
   // ── Escola layer for ICG map ──
-  const icgBuildEscolaLayer = () => {
+  function icgBuildEscolaLayer() {
     if (!S.escolasData?.escolas || !S.map) return;
     if (S.mapLayer) { S.mapLayer.remove(); S.mapLayer = null; }
     if (S.mapLegend) { S.mapLegend.remove(); S.mapLegend = null; }
@@ -8098,7 +8129,7 @@ function renderIcg() {
     };
     legend.addTo(S.map);
     S.mapLegend = legend;
-  };
+  }
 
   // Re-populate topbar filters
   const selAno = document.getElementById('sel-ano');
@@ -8336,18 +8367,19 @@ function renderAfd() {
               <option value="eja_fund">EJA Fund.</option>
               ${JV_MODE ? '' : '<option value="eja_medio">EJA Médio</option>'}
             </select>
+            ${JV_MODE ? '' : `
             <div class="map-layer-toggle">
               <button class="map-layer-btn active" id="afd-btn-layer-mun">Municípios</button>
               <button class="map-layer-btn" id="afd-btn-layer-cre">CREs</button>
               <button class="map-layer-btn" id="afd-btn-layer-esc">Escolas</button>
-            </div>
+            </div>`}
           </div>
         </div>
         <div id="afd-map-leaflet" style="height:380px;border-radius:8px"></div>
       </div>
       <div class="table-wrapper" id="afd-table-wrapper">
         <div class="table-header">
-          <h3>Tabela de Municípios — AFD</h3>
+          <h3>${JV_MODE ? 'Tabela de Escolas — AFD' : 'Tabela de Municípios — AFD'}</h3>
           <input type="text" class="table-search" id="afd-mun-search" placeholder="Buscar...">
         </div>
         <div style="font-size:10px;color:var(--accent);padding:4px 12px 6px;font-weight:600;background:rgba(255,203,4,.08);border-radius:0 0 6px 6px;border-top:1px dashed rgba(255,203,4,.3)">
@@ -8775,12 +8807,16 @@ function renderAfd() {
   };
 
   // Build everything
-  afdBuildMap();
-  afdBuildMunTable();
-  afdBindTableSort('afd-mun-table', 2);
+  if (JV_MODE) {
+    afdBuildEscMap();
+  } else {
+    afdBuildMap();
+    afdBuildMunTable();
+    afdBindTableSort('afd-mun-table', 2);
+  }
   injectExportButtons();
 
-  const afdBuildEscMap = () => {
+  function afdBuildEscMap() {
     const mapEl = document.getElementById('afd-map-leaflet');
     if (!mapEl || !S.geo) return;
     const escData = afd.por_escola_2025 || [];
@@ -8908,7 +8944,7 @@ function renderAfd() {
       if (table) delete table.dataset.sortBound;
       afdBindTableSort('afd-escola-table', 4);
     }
-  };
+  }
 
   // Bind AFD map layer toggle
   const afdBtnMun = document.getElementById('afd-btn-layer-mun');
@@ -8926,6 +8962,7 @@ function renderAfd() {
   }
 
   const afdUpdateActiveMap = () => {
+    if (JV_MODE) { afdBuildEscMap(); return; }
     if (afdBtnEsc?.classList.contains('active')) { afdBuildEscMap(); }
     else if (afdBtnCre?.classList.contains('active')) { afdBuildCreMap(); } 
     else { afdBuildMap(); }
@@ -9106,6 +9143,7 @@ function renderTdi() {
       </div>
     </div>
 
+    ${JV_MODE ? '' : `
     <!-- ═══ EIXO: Distribuição Territorial ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/territorial.png" alt=""></span>
@@ -9152,7 +9190,7 @@ function renderTdi() {
         </div>
         <div class="chart-source">${FONTE_TDI}</div>
       </div>
-    </div>
+    </div>`}
   `;
 
   // ── KPIs ──
