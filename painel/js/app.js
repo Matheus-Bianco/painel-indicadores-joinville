@@ -73,14 +73,14 @@ const FONTE_CENSO = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/area
 
 // Paleta Bandeira RS: Verde #00AB4E, Vermelho #EE302F, Amarelo #FFCB04
 const COLORS = {
-  pri: '#1d71b9', priDark: '#14507F', priLight: '#5AADE2', sec: '#3A8CC7',
+  pri: '#003866', priDark: '#00284A', priLight: '#4A86BC', sec: '#2E6FA0',
   red: '#EE302F', redLight: '#F4706F',
   yellow: '#FFCB04', yellowLight: '#FFE066',
   accent: '#FFCB04', accentLight: '#FFE066',
-  federal: '#1565C0', estadual: '#1d71b9', municipal: '#EE302F', privada: '#6A1B9A',
+  federal: '#1565C0', estadual: '#2E6FA0', municipal: '#003866', privada: '#6A1B9A',
   masc: '#1976D2', fem: '#EE302F',
-  branca: '#78909C', preta: '#37474F', parda: '#8D6E63', amarela: '#FFCB04', indigena: '#1d71b9', nd: '#B0BEC5',
-  infantil: '#FFCB04', fundAI: '#0097A7', fundAF: '#F57C00', fundamental: '#1d71b9', medio: '#EE302F', eja: '#1565C0', especial: '#6A1B9A', blue: '#1565C0',
+  branca: '#78909C', preta: '#37474F', parda: '#8D6E63', amarela: '#FFCB04', indigena: '#2E6FA0', nd: '#B0BEC5',
+  infantil: '#FFCB04', fundAI: '#0097A7', fundAF: '#F57C00', fundamental: '#003866', medio: '#EE302F', eja: '#1565C0', especial: '#6A1B9A', blue: '#1565C0',
   gridLine: 'rgba(0,0,0,.06)',
 };
 
@@ -149,7 +149,7 @@ function ensureLeafletMap() {
 /** Contorno municipal Joinville como camada de fundo */
 function addJoinvilleContour(group, styleOverride) {
   if (!JV_MODE || !S.geo) return;
-  const style = styleOverride || { fillColor: '#1d71b9', fillOpacity: 0.06, color: '#14507F', weight: 1.5, opacity: 0.5 };
+  const style = styleOverride || { fillColor: '#003866', fillOpacity: 0.06, color: '#003866', weight: 1.5, opacity: 0.5 };
   L.geoJSON(S.geo, { style: () => style }).eachLayer(l => (group || S.map).addLayer(l));
 }
 
@@ -1152,7 +1152,7 @@ function updateKPIs(ano, su, d) {
     </svg>`;
   }
 
-  const accentColors = { green: '#1d71b9', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
+  const accentColors = { green: '#003866', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
 
   strip.innerHTML = kpis.map((k, i) => {
     const val = su[k.key] || su[k.altKey] || 0;
@@ -1942,7 +1942,7 @@ function zoomToMunicipality(codMun) {
     const cod = layer.feature?.properties?.cod_mun?.substring(0, 7);
     if (cod === codMun) {
       S.map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 10 });
-      layer.setStyle({ weight: 3, color: '#FFB300', fillOpacity: 0.95 });
+      layer.setStyle({ weight: 3, color: '#FFFFFF', fillOpacity: 0.95 });
       layer.bringToFront();
     }
   });
@@ -1953,8 +1953,8 @@ function zoomToMunicipality(codMun) {
 // ══════════════════════════════════════════════════════════
 
 const MAP_SCALE = [
-  '#edf3fa', '#c7dbed', '#8fb8da', '#5a96c7',
-  '#3578b3', '#1d71b9', '#14507F', '#0B2A47'
+  '#edf3fa', '#cfe0f0', '#a9c8e4', '#7faed6',
+  '#5590c4', '#2E6FA0', '#0A5288', '#003866'
 ];
 
 const METRIC_LABELS = {
@@ -1996,7 +1996,7 @@ function buildMap(d, ano, metric) {
       fillColor: value > 0 ? getColor(value, breaks) : '#f0f0f0',
       weight: JV_MODE ? 2 : 0.8,
       opacity: 1,
-      color: JV_MODE ? '#14507F' : '#fff',
+      color: JV_MODE ? '#003866' : '#fff',
       fillOpacity: JV_MODE ? 0.75 : 0.85,
     };
   }
@@ -2057,7 +2057,7 @@ function buildMap(d, ano, metric) {
 
       layer.on({
         mouseover: function (e) {
-          e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 });
+          e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 });
           e.target.bringToFront();
           info.update(feature.properties, munData);
         },
@@ -2588,7 +2588,7 @@ function buildInfraKPIs(infra, ano, anos) {
   }
 
   const sparkKeys = ['total_escolas','IN_INTERNET','IN_BIBLIOTECA','IN_QUADRA_ESPORTES','IN_LABORATORIO_INFORMATICA','IN_CLIMATIZACAO'];
-  const sparkColors = ['#1d71b9','#1d71b9','#FFCB04','#EE302F','#1565C0','#00838F'];
+  const sparkColors = ['#003866','#003866','#FFCB04','#EE302F','#1565C0','#00838F'];
 
   const strip = document.getElementById('infra-kpis');
   strip.innerHTML = kpis.map((k, i) => {
@@ -2781,7 +2781,7 @@ function buildInfraMap(infra, metricKey) {
   
   // Simple 3-tier thresholds for % indicators
   const tiers = [
-    { min: 80, color: '#14507F', label: '≥ 80%' },
+    { min: 80, color: '#003866', label: '≥ 80%' },
     { min: 50, color: '#5cba68', label: '50% – 79%' },
     { min: 0.1, color: '#d5efcf', label: '< 50%' },
   ];
@@ -2804,7 +2804,7 @@ function buildInfraMap(infra, metricKey) {
       const n = d?.indicadores?.[metricKey]?.count || 0;
       layer.bindTooltip(`<strong>${nome}</strong><br>${label}: ${pct.toFixed(1)}% (${n}/${d?.escolas || 0} escolas)`, { sticky: true });
       layer.on({
-        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); },
+        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); },
         mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); },
         click: () => {
           if (S.munSel === cod) { S.munSel = null; } else { S.munSel = cod; }
@@ -2863,7 +2863,7 @@ function buildInfraMapCre(infra, metricKey) {
   }
 
   const tiers = [
-    { min: 80, color: '#14507F', label: '\u2265 80%' },
+    { min: 80, color: '#003866', label: '\u2265 80%' },
     { min: 50, color: '#5cba68', label: '50% \u2013 79%' },
     { min: 0.1, color: '#d5efcf', label: '< 50%' },
   ];
@@ -2881,7 +2881,7 @@ function buildInfraMapCre(infra, metricKey) {
       const agg = creAgg[cod] || {};
       lyr.bindTooltip(`<strong>${nome}</strong><br>${label}: ${(agg.pct || 0).toFixed(1)}% (${agg.escolas || 0} escolas)`, { sticky: true });
       lyr.on({
-        mouseover: e => { e.target.setStyle({ weight: 3, color: '#FFB300', fillOpacity: 0.9 }); e.target.bringToFront(); },
+        mouseover: e => { e.target.setStyle({ weight: 3, color: '#FFFFFF', fillOpacity: 0.9 }); e.target.bringToFront(); },
         mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); },
         click: () => {
           S.creSel = cod;
@@ -3226,7 +3226,7 @@ function buildDocMap(doc) {
   
   // Simple 3-tier thresholds for docent counts
   const tiers = [
-    { min: 500, color: '#14507F', label: '≥ 500' },
+    { min: 500, color: '#003866', label: '≥ 500' },
     { min: 100, color: '#5cba68', label: '100 – 499' },
     { min: 1, color: '#d5efcf', label: '< 100' },
   ];
@@ -3247,7 +3247,7 @@ function buildDocMap(doc) {
       const d = munData[cod] || {};
       layer.bindTooltip(`<strong>${nome}</strong><br>Escolas: ${d.escolas || 0}<br>Docentes: ${formatNum(d.docentes || 0)}`, { sticky: true });
       layer.on({
-        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); },
+        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); },
         mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); },
         click: () => {
           if (S.munSel === cod) { S.munSel = null; } else { S.munSel = cod; }
@@ -3296,7 +3296,7 @@ function buildDocCreMap(doc) {
   }
 
   const tiers = [
-    { min: 3000, color: '#14507F', label: '≥ 3.000' },
+    { min: 3000, color: '#003866', label: '≥ 3.000' },
     { min: 1000, color: '#5cba68', label: '1.000 – 2.999' },
     { min: 0, color: '#d5efcf', label: '< 1.000' },
   ];
@@ -3549,10 +3549,10 @@ function buildDocCharts(doc) {
     S.charts.push(new Chart(razaoEl, {
       type: 'line',
       data: { labels: anos, datasets: [{ label: 'Alunos por Professor', data: razaoData,
-        borderColor: '#14507F', backgroundColor: '#14507F18', fill: true, tension: .35, pointRadius: 5, borderWidth: 2.5 }] },
+        borderColor: '#003866', backgroundColor: '#00386618', fill: true, tension: .35, pointRadius: 5, borderWidth: 2.5 }] },
       options: { ...CHART_DEFAULTS,
         plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
-          datalabels: { display: true, anchor: 'end', align: 'top', offset: 3, font: { family: 'Inter', size: 10, weight: '700' }, color: '#14507F', formatter: v => v?.toFixed(1) ?? '' } },
+          datalabels: { display: true, anchor: 'end', align: 'top', offset: 3, font: { family: 'Inter', size: 10, weight: '700' }, color: '#003866', formatter: v => v?.toFixed(1) ?? '' } },
         scales: { ...CHART_DEFAULTS.scales,
           y: { ...CHART_DEFAULTS.scales.y, beginAtZero: false, min: razaoMin, max: razaoMax,
             ticks: { ...CHART_DEFAULTS.scales.y.ticks, stepSize: 0.5, callback: v => v.toFixed(1) } } } }
@@ -3638,7 +3638,7 @@ function buildFunilTurma(ano) {
     const td = ftl.tamanho_turma[ano];
     const etapas = Object.keys(td);
     const medias = etapas.map(e => td[e].media_alunos);
-    const turmaColors = ['#14507FCC','#3A8CC7CC','#5a96c7CC','#8fb8daCC','#1565C0CC','#E65100CC'];
+    const turmaColors = ['#003866CC','#3A8CC7CC','#5a96c7CC','#8fb8daCC','#1565C0CC','#E65100CC'];
 
     S.charts.push(new Chart(turmaEl, {
       type: 'bar',
@@ -4377,7 +4377,7 @@ function renderSaeb() {
           if (inCre && creBounds === null && S.creSel) creBounds = layer.getBounds();
           else if (inCre && S.creSel) creBounds.extend(layer.getBounds());
           layer.on({
-            mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+            mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
             mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
             click: () => { S.munSel = S.munSel === cod ? null : cod; refreshActiveTab(); }
           });
@@ -4754,7 +4754,7 @@ function renderIdeb() {
             * Classificação adotada para fins de visualização — não corresponde a faixas oficiais do INEP.
           </p>
           <div style="margin-top:14px;background:rgba(29,113,185,.06);border:1px solid rgba(29,113,185,.15);border-radius:6px;padding:10px 14px">
-            <p style="font-size:11px;margin:0 0 8px;color:#14507F;line-height:1.7">
+            <p style="font-size:11px;margin:0 0 8px;color:#003866;line-height:1.7">
               <strong>Metas SEDUC-RS (próximas edições):</strong>
             </p>
             <table style="width:100%;font-size:10.5px;border-collapse:separate;border-spacing:0;margin-bottom:6px">
@@ -4772,7 +4772,7 @@ function renderIdeb() {
               </tbody>
             </table>
             <details style="margin-top:6px">
-              <summary style="font-size:10px;font-weight:600;color:#14507F;cursor:pointer;user-select:none;padding:4px 0">
+              <summary style="font-size:10px;font-weight:600;color:#003866;cursor:pointer;user-select:none;padding:4px 0">
                 📋 Ver projeção completa (2023–2035)
               </summary>
               <div style="margin-top:6px;overflow-x:auto">
@@ -5103,7 +5103,7 @@ function renderIdeb() {
         const cod = feature.properties.cod_mun?.substring(0, 7);
         const md = munData[cod];
         layer.on({
-          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
           mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
           click: () => { S.munSel = S.munSel === cod ? null : cod; refreshActiveTab(); }
         });
@@ -5734,7 +5734,7 @@ function fluxoUpdateKPIs(st, tdiSrc, f, anos, anoSel) {
     { label: 'Abandono Fund.', key: 'aband_fund', value: st.aband_fund, icon: 'img/icons/fundamental.png', accent: 'red', suffix: '%' },
     ...(JV_MODE ? [] : [{ label: 'Abandono Médio', key: 'aband_med', value: st.aband_med, icon: 'img/icons/medio.png', accent: 'red', suffix: '%' }]),
   ];
-  const accentColors = { green: '#1d71b9', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
+  const accentColors = { green: '#003866', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
   const refLabel = prev ? `vs ${prev}` : '';
 
   strip.innerHTML = kpis.map((k, i) => {
@@ -5991,21 +5991,21 @@ function buildFluxoMap(f, anoSel, metricKey) {
   let tiers;
   if (metricDef.higher) {
     tiers = [
-      { min: 95, color: '#14507F', label: '≥ 95%' },
+      { min: 95, color: '#003866', label: '≥ 95%' },
       { min: 90, color: '#5cba68', label: '90% – 94%' },
       { min: 80, color: '#FFDF00', label: '80% – 89%' },
       { min: 0, color: '#EE302F', label: '< 80%' },
     ];
   } else {
     tiers = [
-      { min: 0, max: 3, color: '#14507F', label: '< 3%' },
+      { min: 0, max: 3, color: '#003866', label: '< 3%' },
       { min: 3, max: 8, color: '#5cba68', label: '3% – 7%' },
       { min: 8, max: 15, color: '#FFDF00', label: '8% – 14%' },
       { min: 15, max: 999, color: '#EE302F', label: '≥ 15%' },
     ];
     if (metricDef.tdi) {
       tiers = [
-        { min: 0, max: 10, color: '#14507F', label: '< 10%' },
+        { min: 0, max: 10, color: '#003866', label: '< 10%' },
         { min: 10, max: 20, color: '#5cba68', label: '10% – 19%' },
         { min: 20, max: 30, color: '#FFDF00', label: '20% – 29%' },
         { min: 30, max: 999, color: '#EE302F', label: '≥ 30%' },
@@ -6043,7 +6043,7 @@ function buildFluxoMap(f, anoSel, metricKey) {
       const v = getMunVal(cod);
       layer.bindTooltip(`<strong>${nome}</strong><br>${metricDef.label}: ${v != null ? v.toFixed(1) + '%' : 'Sem dados'}`, { sticky: true });
       layer.on({
-        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); },
+        mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); },
         mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); },
         click: () => {
           if (S.munSel === cod) { S.munSel = null; } else { S.munSel = cod; }
@@ -6105,21 +6105,21 @@ function buildFluxoCreMap(f, anoSel, metricKey) {
   let tiers;
   if (metricDef.higher) {
     tiers = [
-      { min: 95, color: '#14507F', label: '≥ 95%' },
+      { min: 95, color: '#003866', label: '≥ 95%' },
       { min: 90, color: '#5cba68', label: '90% – 94%' },
       { min: 80, color: '#FFDF00', label: '80% – 89%' },
       { min: 0, color: '#EE302F', label: '< 80%' },
     ];
   } else if (metricDef.tdi) {
     tiers = [
-      { min: 0, max: 10, color: '#14507F', label: '< 10%' },
+      { min: 0, max: 10, color: '#003866', label: '< 10%' },
       { min: 10, max: 20, color: '#5cba68', label: '10% – 19%' },
       { min: 20, max: 30, color: '#FFDF00', label: '20% – 29%' },
       { min: 30, max: 999, color: '#EE302F', label: '≥ 30%' },
     ];
   } else {
     tiers = [
-      { min: 0, max: 3, color: '#14507F', label: '< 3%' },
+      { min: 0, max: 3, color: '#003866', label: '< 3%' },
       { min: 3, max: 8, color: '#5cba68', label: '3% – 7%' },
       { min: 8, max: 15, color: '#FFDF00', label: '8% – 14%' },
       { min: 15, max: 999, color: '#EE302F', label: '≥ 15%' },
@@ -6363,21 +6363,21 @@ function fluxoBuildEscMap(f, anoSel, metricKey) {
   let tiers;
   if (metricDef.higher) {
     tiers = [
-      { min: 95, color: '#14507F', label: '≥ 95%' },
+      { min: 95, color: '#003866', label: '≥ 95%' },
       { min: 90, color: '#5cba68', label: '90% – 94%' },
       { min: 80, color: '#FFDF00', label: '80% – 89%' },
       { min: 0, color: '#EE302F', label: '< 80%' },
     ];
   } else if (metricDef.tdi) {
     tiers = [
-      { min: 0, max: 10, color: '#14507F', label: '< 10%' },
+      { min: 0, max: 10, color: '#003866', label: '< 10%' },
       { min: 10, max: 20, color: '#5cba68', label: '10% – 19%' },
       { min: 20, max: 30, color: '#FFDF00', label: '20% – 29%' },
       { min: 30, max: 999, color: '#EE302F', label: '≥ 30%' },
     ];
   } else {
     tiers = [
-      { min: 0, max: 3, color: '#14507F', label: '< 3%' },
+      { min: 0, max: 3, color: '#003866', label: '< 3%' },
       { min: 3, max: 8, color: '#5cba68', label: '3% – 7%' },
       { min: 8, max: 15, color: '#FFDF00', label: '8% – 14%' },
       { min: 15, max: 999, color: '#EE302F', label: '≥ 15%' },
@@ -6969,7 +6969,7 @@ function renderInse() {
         const cod = feature.properties.cod_mun?.substring(0, 7);
         const md = munData[cod];
         layer.on({
-          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
           mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
         });
       }
@@ -7833,7 +7833,7 @@ function renderIcg() {
         const cod = feature.properties.cod_mun?.substring(0, 7);
         const md = munData[cod];
         layer.on({
-          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
           mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
           click: () => { S.munSel = S.munSel === cod ? null : cod; refreshActiveTab(); }
         });
@@ -8672,7 +8672,7 @@ function renderAfd() {
         const cod = feature.properties.cod_mun?.substring(0, 7);
         const md = munData[cod];
         layer.on({
-          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
           mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
           click: () => { S.munSel = S.munSel === cod ? null : cod; refreshActiveTab(); }
         });
@@ -9420,7 +9420,7 @@ function renderTdi() {
         const cod = feature.properties.cod_mun?.substring(0, 7);
         const md = munData[cod];
         layer.on({
-          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFB300', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
+          mouseover: e => { e.target.setStyle({ weight: 2.5, color: '#FFFFFF', fillOpacity: 0.95 }); e.target.bringToFront(); info.update(feature.properties, md); },
           mouseout: e => { S.mapLayer.resetStyle(e.target); e.target.closeTooltip(); info.update(); },
           click: () => { S.munSel = S.munSel === cod ? null : cod; refreshActiveTab(); }
         });
@@ -9639,11 +9639,11 @@ function renderTdi() {
         <tr>
           <td style="text-align:left;font-weight:500">${d.nome}</td>
           <td style="text-align:right;font-weight:600;color:var(--pri)">${d.media != null ? d.media.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#1d71b9">${d.branca != null ? d.branca.toFixed(1) : '-'}</td>
+          <td style="text-align:right;color:#003866">${d.branca != null ? d.branca.toFixed(1) : '-'}</td>
           <td style="text-align:right;color:#333">${d.preta != null ? d.preta.toFixed(1) : '-'}</td>
           <td style="text-align:right;color:#FFCB04">${d.parda != null ? d.parda.toFixed(1) : '-'}</td>
           <td style="text-align:right;color:#E91E63">${d.fem != null ? d.fem.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#1d71b9">${d.masc != null ? d.masc.toFixed(1) : '-'}</td>
+          <td style="text-align:right;color:#003866">${d.masc != null ? d.masc.toFixed(1) : '-'}</td>
         </tr>
       `).join('');
     } else if (tableCont) {
@@ -10025,7 +10025,7 @@ function buildIntegralPct(d) {
 
   // Series config
   const seriesConfig = [
-    { key: 'agregado', label: 'Fund. + Médio', color: '#14507F' },
+    { key: 'agregado', label: 'Fund. + Médio', color: '#003866' },
     { key: 'fundamental', label: 'Fundamental', color: COLORS.fundAI },
     { key: 'medio', label: 'Médio', color: COLORS.medio || '#FF6F00' },
   ];
@@ -10556,7 +10556,7 @@ function buildCreLayer(anoSel, metric) {
 
   const values = Object.values(creData).map(v => v.total).filter(v => v > 0);
   const maxVal = values.length ? Math.max(...values) : 1;
-  const CRE_SCALE = ['#c7dbed', '#8fb8da', '#5a96c7', '#3578b3', '#14507F'];
+  const CRE_SCALE = ['#c7dbed', '#8fb8da', '#5a96c7', '#3578b3', '#003866'];
   const breaks = [0, 0.2, 0.4, 0.6, 0.8].map(t => Math.round(t * maxVal));
 
   function getColor(v) {
@@ -11078,7 +11078,7 @@ function renderDesigualdades() {
               </tr>
             </thead>
             <tbody>
-              <tr><td style="padding:5px 8px;border-bottom:1px solid #eee"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1d71b9;margin-right:5px;vertical-align:middle"></span><strong>Ra\u00e7a/Cor</strong></td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">Branca, Parda, Preta, Ind\u00edgena, Amarela</td></tr>
+              <tr><td style="padding:5px 8px;border-bottom:1px solid #eee"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#003866;margin-right:5px;vertical-align:middle"></span><strong>Ra\u00e7a/Cor</strong></td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">Branca, Parda, Preta, Ind\u00edgena, Amarela</td></tr>
               <tr style="background:#fafbfc"><td style="padding:5px 8px;border-bottom:1px solid #eee"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#E91E63;margin-right:5px;vertical-align:middle"></span><strong>Sexo</strong></td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">Feminino, Masculino</td></tr>
               <tr><td style="padding:5px 8px;border-bottom:1px solid #eee"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#43A047;margin-right:5px;vertical-align:middle"></span><strong>Localiza\u00e7\u00e3o</strong></td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">Urbana, Rural</td></tr>
               <tr style="background:#fafbfc"><td style="padding:5px 8px;border-bottom:1px solid #eee"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#E53935;margin-right:5px;vertical-align:middle"></span><strong>Defici\u00eancia</strong></td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">Com, Sem</td></tr>
@@ -11216,7 +11216,7 @@ function renderDesigualdades() {
               <tr>
                 <th rowspan="2" data-col="nome" class="sortable" style="min-width:220px;cursor:pointer;vertical-align:bottom">Escola \u25b2\u25bc</th>
                 <th colspan="2" style="text-align:center;border-bottom:2px solid var(--pri);font-size:10px;color:var(--pri)">Geral</th>
-                <th colspan="5" style="text-align:center;border-bottom:2px solid #1d71b9;font-size:10px;color:#1d71b9">Ra\u00e7a/Cor</th>
+                <th colspan="5" style="text-align:center;border-bottom:2px solid #003866;font-size:10px;color:#003866">Ra\u00e7a/Cor</th>
                 <th colspan="2" style="text-align:center;border-bottom:2px solid #E91E63;font-size:10px;color:#E91E63">Sexo</th>
                 <th colspan="2" style="text-align:center;border-bottom:2px solid #2E7D32;font-size:10px;color:#2E7D32">Local.</th>
               </tr>
@@ -11396,12 +11396,12 @@ function renderDesigualdades() {
     `).join('');
 
     // Color palettes
-    const RACA_COLORS = { Branca:'#1d71b9', Parda:'#FFCB04', Preta:'#333', 'Ind\u00edgena':'#E53935', Amarela:'#43A047' };
+    const RACA_COLORS = { Branca:'#003866', Parda:'#FFCB04', Preta:'#333', 'Ind\u00edgena':'#E53935', Amarela:'#43A047' };
     const RACA_ORDER = ['Branca','Parda','Preta','Ind\u00edgena','Amarela'];
-    const SEXO_COLORS = { Feminino:'#E91E63', Masculino:'#1d71b9' };
-    const LOC_COLORS = { Urbana:'#1d71b9', Rural:'#43A047' };
-    const DEF_COLORS = { 'Sem Defici\u00eancia':'#1d71b9', 'Com Defici\u00eancia':'#E53935' };
-    const TURNO_COLORS = { 'Manh\u00e3':'#FFCB04', Tarde:'#F57C00', Noite:'#333', Integral:'#1d71b9' };
+    const SEXO_COLORS = { Feminino:'#E91E63', Masculino:'#003866' };
+    const LOC_COLORS = { Urbana:'#003866', Rural:'#43A047' };
+    const DEF_COLORS = { 'Sem Defici\u00eancia':'#003866', 'Com Defici\u00eancia':'#E53935' };
+    const TURNO_COLORS = { 'Manh\u00e3':'#FFCB04', Tarde:'#F57C00', Noite:'#333', Integral:'#003866' };
 
     const DL_VAL = { display: true, font: { size: 10, weight: 'bold' }, color: '#333', anchor: 'end', align: 'top', formatter: v => v != null ? v.toFixed(1) : '' };
     const DL_PCT = { ...DL_VAL, formatter: v => v != null ? v.toFixed(1) + '%' : '' };
@@ -11424,7 +11424,7 @@ function renderDesigualdades() {
           { label: 'Abaixo do Básico', data: racaGroups.map(g => getPadrao('raca', g, 'abaixo')), backgroundColor: '#E53935', borderRadius: 4 },
           { label: 'Básico', data: racaGroups.map(g => getPadrao('raca', g, 'basico')), backgroundColor: '#F57C00', borderRadius: 4 },
           { label: 'Adequado', data: racaGroups.map(g => getPadrao('raca', g, 'adequado')), backgroundColor: '#43A047', borderRadius: 4 },
-          { label: 'Avançado', data: racaGroups.map(g => getPadrao('raca', g, 'avancado')), backgroundColor: '#1d71b9', borderRadius: 4 }
+          { label: 'Avançado', data: racaGroups.map(g => getPadrao('raca', g, 'avancado')), backgroundColor: '#003866', borderRadius: 4 }
         ] },
         options: { ...CHART_DEFAULTS, layout: { padding: DESIG_PAD }, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } }, datalabels: { display: false } },
           scales: { ...CHART_DEFAULTS.scales, x: { stacked: true }, y: { stacked: true, max: 100, beginAtZero: true, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } } }
@@ -11478,7 +11478,7 @@ function renderDesigualdades() {
           { label: 'Abaixo do Básico', data: sexoGroups.map(g => getPadrao('sexo', g, 'abaixo')), backgroundColor: '#E53935', borderRadius: 4 },
           { label: 'Básico', data: sexoGroups.map(g => getPadrao('sexo', g, 'basico')), backgroundColor: '#F57C00', borderRadius: 4 },
           { label: 'Adequado', data: sexoGroups.map(g => getPadrao('sexo', g, 'adequado')), backgroundColor: '#43A047', borderRadius: 4 },
-          { label: 'Avançado', data: sexoGroups.map(g => getPadrao('sexo', g, 'avancado')), backgroundColor: '#1d71b9', borderRadius: 4 }
+          { label: 'Avançado', data: sexoGroups.map(g => getPadrao('sexo', g, 'avancado')), backgroundColor: '#003866', borderRadius: 4 }
         ] },
         options: { ...CHART_DEFAULTS, layout: { padding: DESIG_PAD }, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } }, datalabels: { display: false } },
           scales: { ...CHART_DEFAULTS.scales, x: { stacked: true }, y: { stacked: true, max: 100, beginAtZero: true, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } } }
@@ -11552,7 +11552,7 @@ function renderDesigualdades() {
         type: 'bar',
         data: { labels: rxGroups.map(g => g.replace(' - ', '\n')),
           datasets: [{ label: 'Proficiência', data: rxGroups.map(g => getVal('raca_sexo', g)),
-            backgroundColor: rxGroups.map(g => g.includes('Feminino') ? '#E91E63CC' : '#1d71b9CC'),
+            backgroundColor: rxGroups.map(g => g.includes('Feminino') ? '#E91E63CC' : '#003866CC'),
             borderRadius: 4, barPercentage: 0.6 }] },
         options: { ...CHART_DEFAULTS, layout: { padding: DESIG_PAD }, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, datalabels: DL_VAL },
           scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, beginAtZero: false }, x: { ticks: { font: { size: 9, family: 'Inter' } } } } },
@@ -11564,7 +11564,7 @@ function renderDesigualdades() {
           { label: 'Abaixo do Básico', data: rxGroups.map(g => getPadrao('raca_sexo', g, 'abaixo')), backgroundColor: '#E53935', borderRadius: 4 },
           { label: 'Básico', data: rxGroups.map(g => getPadrao('raca_sexo', g, 'basico')), backgroundColor: '#F57C00', borderRadius: 4 },
           { label: 'Adequado', data: rxGroups.map(g => getPadrao('raca_sexo', g, 'adequado')), backgroundColor: '#43A047', borderRadius: 4 },
-          { label: 'Avançado', data: rxGroups.map(g => getPadrao('raca_sexo', g, 'avancado')), backgroundColor: '#1d71b9', borderRadius: 4 }
+          { label: 'Avançado', data: rxGroups.map(g => getPadrao('raca_sexo', g, 'avancado')), backgroundColor: '#003866', borderRadius: 4 }
         ] },
         options: { ...CHART_DEFAULTS, layout: { padding: DESIG_PAD }, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } }, datalabels: { display: false } },
           scales: { ...CHART_DEFAULTS.scales, x: { stacked: true, ticks: { font: { size: 9, family: 'Inter' } } }, y: { stacked: true, max: 100, beginAtZero: true, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } } }
@@ -11623,7 +11623,7 @@ function renderDesigualdades() {
         type: 'bar',
         data: { labels: creEntries.map(c => c.nome),
           datasets: [{ label: 'Profici\u00eancia', data: creEntries.map(c => c.val),
-            backgroundColor: creEntries.map(c => c.val >= median ? '#1d71b9CC' : '#E53935CC'),
+            backgroundColor: creEntries.map(c => c.val >= median ? '#003866CC' : '#E53935CC'),
             borderRadius: 3, barPercentage: 0.7 }] },
         options: { ...CHART_DEFAULTS, indexAxis: 'y',
           plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, datalabels: { ...DL_VAL, anchor: 'end', align: 'right', font: { size: 8, weight: 'bold' } } },
@@ -11634,7 +11634,7 @@ function renderDesigualdades() {
     // ── 8. PANORAMA MULTI-ETAPA ──
     const panLabels = [];
     const panRacas = { 'Branca': [], 'Parda': [], 'Preta': [], 'Indígena': [], 'Amarela': [] };
-    const racaCoresPan = { 'Branca': '#1d71b9CC', 'Parda': '#FFCB04CC', 'Preta': '#333333CC', 'Indígena': '#E53935CC', 'Amarela': '#43A047CC' };
+    const racaCoresPan = { 'Branca': '#003866CC', 'Parda': '#FFCB04CC', 'Preta': '#333333CC', 'Indígena': '#E53935CC', 'Amarela': '#43A047CC' };
     
     ETAPAS.forEach(et => {
       ['LP', 'MT'].forEach(dc => {
@@ -11743,13 +11743,13 @@ function renderDesigualdades() {
         <td style="text-align:left;font-weight:500;font-size:10px">${d.nome}</td>
         <td style="text-align:right;font-weight:600;color:var(--pri)">${fmt(d.media_lp)}</td>
         <td style="text-align:right;font-weight:600;color:var(--pri)">${fmt(d.media_mt)}</td>
-        <td style="text-align:right;color:#1d71b9">${fmt(d.branca)}</td>
+        <td style="text-align:right;color:#003866">${fmt(d.branca)}</td>
         <td style="text-align:right;color:#333">${fmt(d.preta)}</td>
         <td style="text-align:right;color:#FFCB04">${fmt(d.parda)}</td>
         <td style="text-align:right;color:#8B4513">${fmt(d.indigena)}</td>
         <td style="text-align:right;color:#FF8C00">${fmt(d.amarela)}</td>
         <td style="text-align:right;color:#E91E63">${fmt(d.fem)}</td>
-        <td style="text-align:right;color:#1d71b9">${fmt(d.masc)}</td>
+        <td style="text-align:right;color:#003866">${fmt(d.masc)}</td>
         <td style="text-align:right;color:#2E7D32">${fmt(d.urbana)}</td>
         <td style="text-align:right;color:#795548">${fmt(d.rural)}</td>
       </tr>
@@ -12735,7 +12735,7 @@ function renderSaers() {
             </tbody>
           </table>
           <div style="background:rgba(13,59,102,.05);border:1px solid rgba(13,59,102,.12);border-radius:6px;padding:10px 14px">
-            <p style="font-size:10.5px;margin:0;color:#14507F;line-height:1.7">
+            <p style="font-size:10.5px;margin:0;color:#003866;line-height:1.7">
               <strong>Nota:</strong> O SAERS utiliza a <strong>Teoria de Resposta ao Item (TRI)</strong> para o
               cálculo da proficiência, garantindo comparabilidade entre edições. Os padrões de desempenho
               são definidos pelo <strong>CAED/UFJF</strong> com base nos pontos de corte estabelecidos para cada etapa.
