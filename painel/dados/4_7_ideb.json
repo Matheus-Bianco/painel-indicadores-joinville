@@ -1,0 +1,291 @@
+{
+  "metadata": {
+    "fonte": "IDEB/INEP — Divulgação 2023",
+    "recorte": "Rede Municipal RS",
+    "gerado_em": "2026-06-14T18:45:02.413678",
+    "formula": "IDEB = N (Nota SAEB padronizada) × P (Indicador de Rendimento)"
+  },
+  "serie_temporal": {
+    "2005": {
+      "AI": {
+        "ideb": 5.0,
+        "nota_saeb": 5.39,
+        "rendimento": 0.9263,
+        "n_escolas": 49
+      },
+      "AF": {
+        "ideb": 4.61,
+        "nota_saeb": 5.08,
+        "rendimento": 0.907,
+        "n_escolas": 39
+      }
+    },
+    "2007": {
+      "AI": {
+        "ideb": 5.57,
+        "nota_saeb": 5.84,
+        "rendimento": 0.9531,
+        "n_escolas": 53,
+        "meta": 5.06
+      },
+      "AF": {
+        "ideb": 4.83,
+        "nota_saeb": 5.27,
+        "rendimento": 0.9174,
+        "n_escolas": 44,
+        "meta": 4.64
+      }
+    },
+    "2009": {
+      "AI": {
+        "ideb": 6.04,
+        "nota_saeb": 6.35,
+        "rendimento": 0.9514,
+        "n_escolas": 61,
+        "meta": 5.38
+      },
+      "AF": {
+        "ideb": 5.24,
+        "nota_saeb": 5.72,
+        "rendimento": 0.9147,
+        "n_escolas": 46,
+        "meta": 4.83
+      }
+    },
+    "2011": {
+      "AI": {
+        "ideb": 6.3,
+        "nota_saeb": 6.6,
+        "rendimento": 0.9545,
+        "n_escolas": 64,
+        "meta": 5.79
+      },
+      "AF": {
+        "ideb": 5.39,
+        "nota_saeb": 5.89,
+        "rendimento": 0.9143,
+        "n_escolas": 52,
+        "meta": 5.07
+      }
+    },
+    "2013": {
+      "AI": {
+        "ideb": 6.81,
+        "nota_saeb": 7.08,
+        "rendimento": 0.9608,
+        "n_escolas": 60,
+        "meta": 6.04
+      },
+      "AF": {
+        "ideb": 5.43,
+        "nota_saeb": 5.94,
+        "rendimento": 0.9129,
+        "n_escolas": 52,
+        "meta": 5.41
+      }
+    },
+    "2015": {
+      "AI": {
+        "ideb": 7.05,
+        "nota_saeb": 7.3,
+        "rendimento": 0.9647,
+        "n_escolas": 63,
+        "meta": 6.3
+      },
+      "AF": {
+        "ideb": 5.69,
+        "nota_saeb": 6.1,
+        "rendimento": 0.931,
+        "n_escolas": 52,
+        "meta": 5.74
+      }
+    },
+    "2017": {
+      "AI": {
+        "ideb": 7.31,
+        "nota_saeb": 7.5,
+        "rendimento": 0.974,
+        "n_escolas": 72,
+        "meta": 6.5
+      },
+      "AF": {
+        "ideb": 6.15,
+        "nota_saeb": 6.48,
+        "rendimento": 0.949,
+        "n_escolas": 49,
+        "meta": 5.97
+      }
+    },
+    "2019": {
+      "AI": {
+        "ideb": 7.28,
+        "nota_saeb": 7.42,
+        "rendimento": 0.9806,
+        "n_escolas": 68,
+        "meta": 6.75
+      },
+      "AF": {
+        "ideb": 6.24,
+        "nota_saeb": 6.47,
+        "rendimento": 0.9633,
+        "n_escolas": 50,
+        "meta": 6.18
+      }
+    },
+    "2021": {
+      "AI": {
+        "ideb": 6.8,
+        "nota_saeb": 6.93,
+        "rendimento": 0.9803,
+        "n_escolas": 67,
+        "meta": 7.02
+      },
+      "AF": {
+        "ideb": 5.95,
+        "nota_saeb": 6.12,
+        "rendimento": 0.9689,
+        "n_escolas": 42,
+        "meta": 6.43
+      }
+    },
+    "2023": {
+      "AI": {
+        "ideb": 7.1,
+        "nota_saeb": 7.13,
+        "rendimento": 0.9961,
+        "n_escolas": 73
+      },
+      "AF": {
+        "ideb": 6.08,
+        "nota_saeb": 6.16,
+        "rendimento": 0.9857,
+        "n_escolas": 53
+      }
+    }
+  },
+  "por_municipio": {
+    "2005": {
+      "4209102": {
+        "AI": {
+          "ideb": 5.0,
+          "n_escolas": 49
+        },
+        "AF": {
+          "ideb": 4.61,
+          "n_escolas": 39
+        }
+      }
+    },
+    "2007": {
+      "4209102": {
+        "AI": {
+          "ideb": 5.57,
+          "n_escolas": 53
+        },
+        "AF": {
+          "ideb": 4.83,
+          "n_escolas": 44
+        }
+      }
+    },
+    "2009": {
+      "4209102": {
+        "AI": {
+          "ideb": 6.04,
+          "n_escolas": 61
+        },
+        "AF": {
+          "ideb": 5.24,
+          "n_escolas": 46
+        }
+      }
+    },
+    "2011": {
+      "4209102": {
+        "AI": {
+          "ideb": 6.3,
+          "n_escolas": 64
+        },
+        "AF": {
+          "ideb": 5.39,
+          "n_escolas": 52
+        }
+      }
+    },
+    "2013": {
+      "4209102": {
+        "AI": {
+          "ideb": 6.81,
+          "n_escolas": 60
+        },
+        "AF": {
+          "ideb": 5.43,
+          "n_escolas": 52
+        }
+      }
+    },
+    "2015": {
+      "4209102": {
+        "AI": {
+          "ideb": 7.05,
+          "n_escolas": 63
+        },
+        "AF": {
+          "ideb": 5.69,
+          "n_escolas": 52
+        }
+      }
+    },
+    "2017": {
+      "4209102": {
+        "AI": {
+          "ideb": 7.31,
+          "n_escolas": 72
+        },
+        "AF": {
+          "ideb": 6.15,
+          "n_escolas": 49
+        }
+      }
+    },
+    "2019": {
+      "4209102": {
+        "AI": {
+          "ideb": 7.28,
+          "n_escolas": 68
+        },
+        "AF": {
+          "ideb": 6.24,
+          "n_escolas": 50
+        }
+      }
+    },
+    "2021": {
+      "4209102": {
+        "AI": {
+          "ideb": 6.8,
+          "n_escolas": 67
+        },
+        "AF": {
+          "ideb": 5.95,
+          "n_escolas": 42
+        }
+      }
+    },
+    "2023": {
+      "4209102": {
+        "AI": {
+          "ideb": 7.1,
+          "n_escolas": 73
+        },
+        "AF": {
+          "ideb": 6.08,
+          "n_escolas": 53
+        }
+      }
+    }
+  },
+  "lookup_municipios": {
+    "4209102": "Joinville"
+  }
+}

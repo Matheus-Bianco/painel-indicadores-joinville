@@ -1,0 +1,27 @@
+# ??? Dependências ???
+node_modules/
+
+# ??? Python ???
+__pycache__/
+*.pyc
+*.pyo
+
+# ??? Bases de dados brutas (microdados pesados — NÃO versionar) ???
+00. Bases de Dados/
+000. Bases_Básicas/
+000. Fotos/
+
+# ??? Planilhas / dados brutos na raiz ???
+*.xlsx
+*.csv
+*.CSV
+
+# ??? Scratch de desenvolvimento (diffs/temporários) ???
+*_diff.txt
+diff*.txt
+desig_func*.txt
+painel/*.txt
+
+# ??? Sistema ???
+Thumbs.db
+.DS_Store

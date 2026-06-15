@@ -1,0 +1,639 @@
+{
+  "metadata": {
+    "fonte": "Censo Escolar INEP",
+    "uf": "SC",
+    "municipio": "Joinville",
+    "rede": "municipal",
+    "gerado_em": "2026-06-14T18:57:50.836972"
+  },
+  "funil_por_serie": {
+    "2023": {
+      "1_ano": 5929,
+      "2_ano": 6526,
+      "3_ano": 6341,
+      "4_ano": 5854,
+      "5_ano": 6039,
+      "6_ano": 5674,
+      "7_ano": 5601,
+      "8_ano": 5386,
+      "9_ano": 5110,
+      "em_1": 0,
+      "em_2": 0,
+      "em_3": 0,
+      "em_4": 0
+    },
+    "2024": {
+      "1_ano": 6197,
+      "2_ano": 6054,
+      "3_ano": 6668,
+      "4_ano": 6467,
+      "5_ano": 5959,
+      "6_ano": 5693,
+      "7_ano": 5658,
+      "8_ano": 5628,
+      "9_ano": 5005,
+      "em_1": 0,
+      "em_2": 0,
+      "em_3": 0,
+      "em_4": 0
+    }
+  },
+  "tamanho_turma": {
+    "2010": {
+      "Educacao Basica": {
+        "matriculas": 61961,
+        "turmas": 2430,
+        "media_alunos": 25.5
+      },
+      "Ed. Infantil": {
+        "matriculas": 10899,
+        "turmas": 514,
+        "media_alunos": 21.2
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 25168,
+        "turmas": 1066,
+        "media_alunos": 23.6
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20667,
+        "turmas": 688,
+        "media_alunos": 30.0
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 5227,
+        "turmas": 162,
+        "media_alunos": 32.3
+      }
+    },
+    "2011": {
+      "Educacao Basica": {
+        "matriculas": 61129,
+        "turmas": 2399,
+        "media_alunos": 25.5
+      },
+      "Ed. Infantil": {
+        "matriculas": 11002,
+        "turmas": 514,
+        "media_alunos": 21.4
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 25415,
+        "turmas": 1061,
+        "media_alunos": 24.0
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20827,
+        "turmas": 688,
+        "media_alunos": 30.3
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 3885,
+        "turmas": 136,
+        "media_alunos": 28.6
+      }
+    },
+    "2012": {
+      "Educacao Basica": {
+        "matriculas": 59778,
+        "turmas": 2378,
+        "media_alunos": 25.1
+      },
+      "Ed. Infantil": {
+        "matriculas": 10865,
+        "turmas": 521,
+        "media_alunos": 20.9
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 26055,
+        "turmas": 1058,
+        "media_alunos": 24.6
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20454,
+        "turmas": 675,
+        "media_alunos": 30.3
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 2404,
+        "turmas": 124,
+        "media_alunos": 19.4
+      }
+    },
+    "2013": {
+      "Educacao Basica": {
+        "matriculas": 60141,
+        "turmas": 2395,
+        "media_alunos": 25.1
+      },
+      "Ed. Infantil": {
+        "matriculas": 11287,
+        "turmas": 526,
+        "media_alunos": 21.5
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 26968,
+        "turmas": 1078,
+        "media_alunos": 25.0
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 19887,
+        "turmas": 670,
+        "media_alunos": 29.7
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1999,
+        "turmas": 121,
+        "media_alunos": 16.5
+      }
+    },
+    "2014": {
+      "Educacao Basica": {
+        "matriculas": 59432,
+        "turmas": 2421,
+        "media_alunos": 24.5
+      },
+      "Ed. Infantil": {
+        "matriculas": 11644,
+        "turmas": 566,
+        "media_alunos": 20.6
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 27258,
+        "turmas": 1100,
+        "media_alunos": 24.8
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 18950,
+        "turmas": 672,
+        "media_alunos": 28.2
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1580,
+        "turmas": 83,
+        "media_alunos": 19.0
+      }
+    },
+    "2015": {
+      "Educacao Basica": {
+        "matriculas": 61003,
+        "turmas": 2474,
+        "media_alunos": 24.7
+      },
+      "Ed. Infantil": {
+        "matriculas": 12666,
+        "turmas": 627,
+        "media_alunos": 20.2
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 27766,
+        "turmas": 1110,
+        "media_alunos": 25.0
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 18858,
+        "turmas": 654,
+        "media_alunos": 28.8
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1713,
+        "turmas": 83,
+        "media_alunos": 20.6
+      }
+    },
+    "2016": {
+      "Educacao Basica": {
+        "matriculas": 63651,
+        "turmas": 2629,
+        "media_alunos": 24.2
+      },
+      "Ed. Infantil": {
+        "matriculas": 15076,
+        "turmas": 759,
+        "media_alunos": 19.9
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 27644,
+        "turmas": 1104,
+        "media_alunos": 25.0
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 19103,
+        "turmas": 661,
+        "media_alunos": 28.9
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1828,
+        "turmas": 105,
+        "media_alunos": 17.4
+      }
+    },
+    "2017": {
+      "Educacao Basica": {
+        "matriculas": 65957,
+        "turmas": 2727,
+        "media_alunos": 24.2
+      },
+      "Ed. Infantil": {
+        "matriculas": 17001,
+        "turmas": 862,
+        "media_alunos": 19.7
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 27699,
+        "turmas": 1097,
+        "media_alunos": 25.2
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 19783,
+        "turmas": 662,
+        "media_alunos": 29.9
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1418,
+        "turmas": 104,
+        "media_alunos": 13.6
+      }
+    },
+    "2018": {
+      "Educacao Basica": {
+        "matriculas": 68467,
+        "turmas": 2823,
+        "media_alunos": 24.3
+      },
+      "Ed. Infantil": {
+        "matriculas": 18479,
+        "turmas": 944,
+        "media_alunos": 19.6
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 28327,
+        "turmas": 1111,
+        "media_alunos": 25.5
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20318,
+        "turmas": 670,
+        "media_alunos": 30.3
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1311,
+        "turmas": 96,
+        "media_alunos": 13.7
+      }
+    },
+    "2019": {
+      "Educacao Basica": {
+        "matriculas": 69734,
+        "turmas": 2825,
+        "media_alunos": 24.7
+      },
+      "Ed. Infantil": {
+        "matriculas": 18967,
+        "turmas": 949,
+        "media_alunos": 20.0
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 28889,
+        "turmas": 1123,
+        "media_alunos": 25.7
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20454,
+        "turmas": 660,
+        "media_alunos": 31.0
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1382,
+        "turmas": 91,
+        "media_alunos": 15.2
+      }
+    },
+    "2020": {
+      "Educacao Basica": {
+        "matriculas": 70542,
+        "turmas": 2845,
+        "media_alunos": 24.8
+      },
+      "Ed. Infantil": {
+        "matriculas": 19087,
+        "turmas": 975,
+        "media_alunos": 19.6
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 28966,
+        "turmas": 1134,
+        "media_alunos": 25.5
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 20947,
+        "turmas": 665,
+        "media_alunos": 31.5
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1460,
+        "turmas": 67,
+        "media_alunos": 21.8
+      }
+    },
+    "2021": {
+      "Educacao Basica": {
+        "matriculas": 71154,
+        "turmas": 2865,
+        "media_alunos": 24.8
+      },
+      "Ed. Infantil": {
+        "matriculas": 19311,
+        "turmas": 1000,
+        "media_alunos": 19.3
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 29416,
+        "turmas": 1136,
+        "media_alunos": 25.9
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 21162,
+        "turmas": 668,
+        "media_alunos": 31.7
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 1213,
+        "turmas": 59,
+        "media_alunos": 20.6
+      }
+    },
+    "2022": {
+      "Educacao Basica": {
+        "matriculas": 72811,
+        "turmas": 2964,
+        "media_alunos": 24.6
+      },
+      "Ed. Infantil": {
+        "matriculas": 19696,
+        "turmas": 1012,
+        "media_alunos": 19.5
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 30583,
+        "turmas": 1187,
+        "media_alunos": 25.8
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 21757,
+        "turmas": 715,
+        "media_alunos": 30.4
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 734,
+        "turmas": 48,
+        "media_alunos": 15.3
+      }
+    },
+    "2023": {
+      "Educacao Basica": {
+        "matriculas": 73062,
+        "turmas": 3214,
+        "media_alunos": 22.7
+      },
+      "Ed. Infantil": {
+        "matriculas": 19823,
+        "turmas": 1277,
+        "media_alunos": 15.5
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 30689,
+        "turmas": 1155,
+        "media_alunos": 26.6
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 21771,
+        "turmas": 723,
+        "media_alunos": 30.1
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 713,
+        "turmas": 56,
+        "media_alunos": 12.7
+      }
+    },
+    "2024": {
+      "Educacao Basica": {
+        "matriculas": 74259,
+        "turmas": 3481,
+        "media_alunos": 21.3
+      },
+      "Ed. Infantil": {
+        "matriculas": 20243,
+        "turmas": 1549,
+        "media_alunos": 13.1
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 31345,
+        "turmas": 1161,
+        "media_alunos": 27.0
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 21984,
+        "turmas": 720,
+        "media_alunos": 30.5
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 671,
+        "turmas": 50,
+        "media_alunos": 13.4
+      }
+    }
+  },
+  "localizacao_diferenciada": {
+    "2010": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 152,
+        "matriculas": 61961
+      }
+    },
+    "2011": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 150,
+        "matriculas": 61129
+      }
+    },
+    "2012": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 143,
+        "matriculas": 59778
+      }
+    },
+    "2013": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 121
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 139,
+        "matriculas": 60020
+      }
+    },
+    "2014": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 127
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 141,
+        "matriculas": 59305
+      }
+    },
+    "2015": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 132
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 145,
+        "matriculas": 60871
+      }
+    },
+    "2016": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 175
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 148,
+        "matriculas": 63476
+      }
+    },
+    "2017": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 179
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 152,
+        "matriculas": 65778
+      }
+    },
+    "2018": {
+      "Unidade de Conservacao": {
+        "escolas": 1,
+        "matriculas": 153
+      },
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 155,
+        "matriculas": 68314
+      }
+    },
+    "2019": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 156,
+        "matriculas": 69734
+      }
+    },
+    "2020": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 159,
+        "matriculas": 70542
+      }
+    },
+    "2021": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 158,
+        "matriculas": 71154
+      }
+    },
+    "2022": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 160,
+        "matriculas": 72811
+      }
+    },
+    "2023": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 162,
+        "matriculas": 73062
+      }
+    },
+    "2024": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 162,
+        "matriculas": 74259
+      }
+    }
+  }
+}

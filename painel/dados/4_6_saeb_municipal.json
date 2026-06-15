@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "fonte": "Microdados SAEB/INEP",
+    "recorte": "Rede Municipal RS",
+    "gerado_em": "2026-06-14T19:06:59.602444"
+  },
+  "serie_temporal": {
+    "2017": {
+      "5EF": {
+        "media_lp": 247.1,
+        "media_mt": 260.5,
+        "label": "5º Ano EF"
+      },
+      "9EF": {
+        "media_lp": 292.3,
+        "media_mt": 296.7,
+        "label": "9º Ano EF"
+      }
+    },
+    "2019": {
+      "5EF": {
+        "media_lp": 243.3,
+        "media_mt": 260.8,
+        "label": "5º Ano EF"
+      },
+      "9EF": {
+        "media_lp": 290.6,
+        "media_mt": 299.1,
+        "label": "9º Ano EF"
+      }
+    },
+    "2021": {
+      "5EF": {
+        "media_lp": 233.6,
+        "media_mt": 245.8,
+        "label": "5º Ano EF"
+      },
+      "9EF": {
+        "media_lp": 281.0,
+        "media_mt": 282.4,
+        "label": "9º Ano EF"
+      }
+    }
+  },
+  "por_municipio": {
+    "2017": {
+      "4209102": {
+        "5EF": {
+          "media_lp": 247.1,
+          "media_mt": 260.5
+        },
+        "9EF": {
+          "media_lp": 292.3,
+          "media_mt": 296.7
+        }
+      }
+    },
+    "2019": {
+      "4209102": {
+        "5EF": {
+          "media_lp": 243.3,
+          "media_mt": 260.8
+        },
+        "9EF": {
+          "media_lp": 290.6,
+          "media_mt": 299.1
+        }
+      }
+    },
+    "2021": {
+      "4209102": {
+        "5EF": {
+          "media_lp": 233.6,
+          "media_mt": 245.8
+        },
+        "9EF": {
+          "media_lp": 281.0,
+          "media_mt": 282.4
+        }
+      }
+    }
+  },
+  "lookup_municipios": {
+    "4209102": "Joinville"
+  }
+}
