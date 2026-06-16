@@ -5382,7 +5382,7 @@ function renderHome() {
 
         <div class="home-grid">
           ${sections.map((s, i) => `
-            <div class="home-card ${s.view === 'escolas' ? 'col-span-4' : ''}" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .06}s both">
+            <div class="home-card" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .06}s both">
               <div class="home-card-icon"><img src="${s.icon}" alt=""></div>
               <div class="home-card-text">
                 <div class="home-card-title">${s.title}</div>
