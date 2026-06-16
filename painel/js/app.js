@@ -5348,6 +5348,7 @@ function renderHome() {
     { view: 'ideb', icon: 'img/icons/nav_ideb.png', title: 'IDEB', desc: 'Índice de Desenvolvimento da Educação Básica' },
     { view: 'tdi', icon: 'img/icons/politicas.png', title: 'Distorção Idade-Série', desc: 'Taxa de defasagem escolar por etapa' },
     { view: 'escolas', icon: 'img/icons/escola.png', title: 'Visão por Escola', desc: 'Mapa georreferenciado com indicadores por escola' },
+    { view: 'extracao', icon: 'img/icons/panorama.png', title: 'Área de Extração', desc: 'Baixe as planilhas (CSV/JSON) dos dados do painel' },
   ].filter(s => !JV_MODE || !['saers', 'desigualdades'].includes(s.view));
 
   main.innerHTML = `
@@ -9873,6 +9874,7 @@ function initNav() {
       else if (view === 'tdi') { renderTdi(); }
       else if (view === 'desigualdades' && S.desig) { renderDesigualdades(); }
       else if (view === 'escolas') { renderEscolas(); }
+      else if (view === 'extracao') { renderExtracao(); }
       else {
         const main = document.getElementById('main-content');
         destroyCharts(); destroyMap();
@@ -13832,6 +13834,225 @@ function buildSaersMunTable(yearData, etapaFilt) {
       });
     });
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// ÁREA DE EXTRAÇÃO — download de planilhas (CSV) e dados brutos (JSON)
+// ══════════════════════════════════════════════════════════
+
+const EXTR_ICON_CSV = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
+const EXTR_ICON_JSON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+
+const EXTRACAO_DATASETS = [
+  { id: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas',
+    desc: 'Matrículas por etapa, perfil dos alunos (sexo/raça), integral, noturno e educação especial.',
+    fonte: 'INEP — Censo Escolar', file: 'dados/4_1_acesso_matriculas.json', state: 'data' },
+  { id: 'infra', icon: 'img/icons/nav_infra.png', title: 'Infraestrutura',
+    desc: 'Recursos físicos e tecnológicos das escolas (% de oferta por categoria).',
+    fonte: 'INEP — Censo Escolar', file: 'dados/4_5_infraestrutura.json', state: 'infra' },
+  { id: 'docencia', icon: 'img/icons/sec_docentes.png', title: 'Docência',
+    desc: 'Número de docentes por etapa, perfil e razão aluno/professor.',
+    fonte: 'INEP — Censo Escolar', file: 'dados/4_5_docentes.json', state: 'doc' },
+  { id: 'afd', icon: 'img/icons/professor.png', title: 'Formação Docente (AFD)',
+    desc: 'Adequação da formação docente por etapa, com detalhamento por escola.',
+    fonte: 'INEP — Indicador de Adequação da Formação Docente', file: 'dados/4_9_afd.json', state: 'afd' },
+  { id: 'fluxo', icon: 'img/icons/sec_evolucao.png', title: 'Fluxo e Rendimento',
+    desc: 'Taxas de aprovação, reprovação e abandono (município e por escola).',
+    fonte: 'INEP — Indicadores de Rendimento Escolar', file: 'dados/4_3_fluxo_rendimento.json', state: 'fluxo' },
+  { id: 'tdi', icon: 'img/icons/politicas.png', title: 'Distorção Idade-Série (TDI)',
+    desc: 'Taxa de defasagem idade-série por etapa, série e localização.',
+    fonte: 'INEP — Indicador de Distorção Idade-Série', file: 'dados/4_10_tdi.json', state: 'tdi' },
+  { id: 'icg', icon: 'img/icons/escola.png', title: 'Complexidade de Gestão (ICG)',
+    desc: 'Distribuição das escolas por nível de complexidade de gestão.',
+    fonte: 'INEP — Indicador de Complexidade de Gestão da Escola', file: 'dados/4_8_icg.json', state: 'icg' },
+  { id: 'inse', icon: 'img/icons/nav_desigualdades.png', title: 'Contexto Socioeconômico (INSE)',
+    desc: 'Indicador de Nível Socioeconômico médio e distribuição por nível.',
+    fonte: 'INEP — Indicador de Nível Socioeconômico (INSE/SAEB)', file: 'dados/4_7_inse.json', state: 'inse' },
+  { id: 'saeb', icon: 'img/icons/sec_saeb.png', title: 'SAEB',
+    desc: 'Proficiência média em Língua Portuguesa e Matemática (5º e 9º ano EF).',
+    fonte: 'INEP — Microdados SAEB', file: 'dados/4_6_saeb.json', state: 'saeb' },
+  { id: 'ideb', icon: 'img/icons/nav_ideb.png', title: 'IDEB',
+    desc: 'Índice de Desenvolvimento da Educação Básica, nota SAEB e indicador de rendimento.',
+    fonte: 'INEP — IDEB', file: 'dados/4_7_ideb.json', state: 'ideb' },
+  { id: 'escolas', icon: 'img/icons/escola.png', title: 'Cadastro de Escolas',
+    desc: 'Lista georreferenciada das escolas com indicadores consolidados por unidade.',
+    fonte: 'INEP — Censo Escolar', file: 'dados/escolas_municipais.json', state: 'escolasData' },
+];
+
+/** Achata um objeto em pares chave→valor escalar (objetos aninhados viram "pai.filho") */
+function extrFlatten(obj, prefix, out) {
+  out = out || {};
+  for (const k in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    const v = obj[k];
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+      extrFlatten(v, key, out);
+    } else if (!Array.isArray(v)) {
+      out[key] = v;
+    }
+  }
+  return out;
+}
+
+/** Constrói {header, rows} a partir de um nó {ano: {...}} (uma linha por ano) */
+function extrSerieRows(node, firstCol) {
+  const keys = Object.keys(node).sort();
+  const flats = keys.map(y => ({ k: y, flat: extrFlatten(node[y]) }));
+  const cols = [];
+  flats.forEach(r => Object.keys(r.flat).forEach(c => { if (!cols.includes(c)) cols.push(c); }));
+  return {
+    header: [firstCol, ...cols],
+    rows: flats.map(r => [r.k, ...cols.map(c => (r.flat[c] != null ? r.flat[c] : ''))]),
+  };
+}
+
+/** Constrói {header, rows} a partir de um array de objetos (uma linha por item) */
+function extrArrayRows(arr) {
+  const flats = arr.map(o => extrFlatten(o));
+  const cols = [];
+  flats.forEach(f => Object.keys(f).forEach(c => { if (!cols.includes(c)) cols.push(c); }));
+  return { header: cols, rows: flats.map(f => cols.map(c => (f[c] != null ? f[c] : ''))) };
+}
+
+function extrGetData(ds) { return ds ? S[ds.state] : null; }
+
+/** Nó de série histórica municipal do dataset (compatível com os vários ETLs) */
+function extrSerieNode(d) {
+  if (!d) return null;
+  return d.serie_temporal || d.serie_temporal_total || null;
+}
+
+/** Listas por escola disponíveis no dataset (escolas[] ou por_escola_AAAA[]) */
+function extrEscolaArrays(d) {
+  const res = [];
+  if (!d) return res;
+  if (Array.isArray(d.escolas) && d.escolas.length) res.push({ key: 'escolas', label: 'Escolas', arr: d.escolas });
+  Object.keys(d).forEach(k => {
+    if (k.indexOf('por_escola') === 0 && Array.isArray(d[k]) && d[k].length) {
+      const yr = (k.match(/\d{4}/) || [])[0];
+      res.push({ key: k, label: yr ? `Por escola (${yr})` : 'Por escola', arr: d[k] });
+    }
+  });
+  return res;
+}
+
+function extrCsvCell(v) {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v).replace('.', ',');
+  return String(v).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+}
+
+function extrMeta(ds, sufixo) {
+  return [
+    ['Indicador', ds.title + (sufixo ? ' — ' + sufixo : '')],
+    ['Fonte', ds.fonte],
+    ['Rede', 'Municipal'],
+    ['Municipio', 'Joinville/SC (IBGE 4209102)'],
+    ['Extraido_em', new Date().toLocaleDateString('pt-BR')],
+  ];
+}
+
+function extrDownloadCSV(filename, header, rows, meta) {
+  const all = [];
+  (meta || []).forEach(m => all.push(m));
+  if (meta && meta.length) all.push([]);
+  all.push(header);
+  rows.forEach(r => all.push(r));
+  const csv = '\uFEFF' + all.map(r => r.map(extrCsvCell).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function extrBaixarSerie(id) {
+  const ds = EXTRACAO_DATASETS.find(x => x.id === id);
+  const node = extrSerieNode(extrGetData(ds));
+  if (!node) { alert('Série histórica indisponível para este indicador.'); return; }
+  const { header, rows } = extrSerieRows(node, 'Ano');
+  extrDownloadCSV(`joinville_${id}_serie_historica.csv`, header, rows, extrMeta(ds, 'série histórica'));
+}
+
+function extrBaixarEscola(id, key) {
+  const ds = EXTRACAO_DATASETS.find(x => x.id === id);
+  const arrs = extrEscolaArrays(extrGetData(ds));
+  const target = arrs.find(a => a.key === key) || arrs[0];
+  if (!target) { alert('Dados por escola indisponíveis.'); return; }
+  const { header, rows } = extrArrayRows(target.arr);
+  extrDownloadCSV(`joinville_${id}_por_escola.csv`, header, rows, extrMeta(ds, 'por escola'));
+}
+
+function extrBaixarJSON(id) {
+  const ds = EXTRACAO_DATASETS.find(x => x.id === id);
+  const d = extrGetData(ds);
+  if (!d) { alert('Dados indisponíveis.'); return; }
+  const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `joinville_${id}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderExtracao() {
+  const main = document.getElementById('main-content');
+  destroyCharts();
+  destroyMap();
+  document.body.classList.remove('sidebar-hidden');
+
+  const cards = EXTRACAO_DATASETS.map(ds => {
+    const d = extrGetData(ds);
+    const hasSerie = !!extrSerieNode(d);
+    const escArrs = extrEscolaArrays(d);
+    let btns = '';
+    if (!d) {
+      btns = `<span class="extr-unavailable">Dados não carregados</span>`;
+    } else {
+      if (hasSerie) btns += `<button class="extr-btn primary" data-act="serie" data-id="${ds.id}">${EXTR_ICON_CSV}<span>Série histórica (CSV)</span></button>`;
+      escArrs.forEach(a => { btns += `<button class="extr-btn" data-act="escola" data-id="${ds.id}" data-key="${a.key}">${EXTR_ICON_CSV}<span>${a.label} (CSV)</span></button>`; });
+      btns += `<button class="extr-btn ghost" data-act="json" data-id="${ds.id}">${EXTR_ICON_JSON}<span>JSON completo</span></button>`;
+    }
+    return `
+      <div class="extr-card">
+        <div class="extr-card-head">
+          <span class="extr-card-icon"><img src="${ds.icon}" alt="" onerror="this.style.display='none'"></span>
+          <div class="extr-card-titles">
+            <div class="extr-card-title">${ds.title}</div>
+            <div class="extr-card-fonte">${ds.fonte}</div>
+          </div>
+        </div>
+        <div class="extr-card-desc">${ds.desc}</div>
+        <div class="extr-card-actions">${btns}</div>
+      </div>`;
+  }).join('');
+
+  main.innerHTML = `
+    <div class="section-content extr-wrap" style="padding:10px 16px 50px;position:relative">
+      ${sectionBanner('img/icons/panorama.png', 'Área de Extração', 'Dados Abertos — Rede Municipal de Joinville/SC', { redeToggle: false })}
+      <style>#main-content .banner-filters { display: none !important; }</style>
+
+      <div class="extr-intro">
+        Baixe os dados abertos exibidos no painel em <strong>CSV</strong> (compatível com Excel e Google Planilhas) ou <strong>JSON</strong>.
+        Os arquivos CSV usam codificação UTF-8 e separador ponto e vírgula <strong>(;)</strong>, com uma linha por ano (série histórica) ou por escola.
+      </div>
+
+      <div class="extr-grid">${cards}</div>
+
+      <div class="extr-foot">
+        Fonte: INEP — Censo Escolar e indicadores educacionais &middot; Recorte: Rede Municipal de Joinville/SC (IBGE 4209102)
+      </div>
+    </div>`;
+
+  main.querySelectorAll('.extr-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === 'serie') extrBaixarSerie(id);
+      else if (act === 'escola') extrBaixarEscola(id, btn.dataset.key);
+      else if (act === 'json') extrBaixarJSON(id);
+    });
+  });
 }
 
 // ══════════════════════════════════════════════════════════
