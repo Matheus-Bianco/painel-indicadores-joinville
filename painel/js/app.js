@@ -890,7 +890,7 @@ function renderAcesso() {
       <span class="section-divider-line"></span>
     </div>
 
-    <div class="charts-grid" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">
+    <div class="charts-grid" style="display:grid;grid-template-columns:${JV_MODE ? '2fr 1fr' : '2fr 1fr 1fr'};gap:10px">
       <div class="chart-card d5">
         <div class="chart-title" id="title-raca">Evolução por Raça/Cor — ${redeLabel}${geoSuffix()}</div>
         <div id="raca-filters" style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px 0;font-size:10px"></div>
@@ -902,11 +902,11 @@ function renderAcesso() {
         <div style="height:220px"><canvas id="chart-sexo"></canvas></div>
         <div class="chart-source">${FONTE_CENSO}</div>
       </div>
-      <div class="chart-card d7">
+      ${JV_MODE ? '' : `<div class="chart-card d7">
         <div class="chart-title" id="title-locdif">Localização Diferenciada — Matrículas${geoSuffix()}</div>
         <div style="height:220px"><canvas id="chart-locdif-bar"></canvas></div>
         <div class="chart-source">${FONTE_CENSO}</div>
-      </div>
+      </div>`}
     </div>
 
     <!-- ═══ EIXO: Educação Especial ═══ -->
@@ -2132,8 +2132,34 @@ const INFRA_CAT_COLORS = {
   'Climatizacao': '#00838F',
 };
 
+// Climatização: a rede deixou de preencher QT_SALAS_UTILIZA_CLIMATIZADAS no
+// Censo a partir de 2023 (cai de ~96% em 2022 para ~3% em 2023 e <1% em 2024).
+// Em Joinville, removemos os anos não confiáveis para não exibir dado incorreto.
+const CLIMA_ULTIMO_ANO_CONFIAVEL = '2022';
+const CLIMA_COLS = ['IN_CLIMATIZACAO', 'PCT_SALAS_CLIMATIZADAS'];
+
+function capClimatizacaoJV(infra) {
+  if (!JV_MODE || !infra || infra._climaCapped) return;
+  const limparNo = (no) => {
+    if (no?.indicadores) for (const c of CLIMA_COLS) delete no.indicadores[c];
+  };
+  for (const [ano, no] of Object.entries(infra.serie_temporal || {})) {
+    if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) limparNo(no);
+  }
+  for (const [ano, muns] of Object.entries(infra.por_municipio || {})) {
+    if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) for (const m of Object.values(muns)) limparNo(m);
+  }
+  for (const grupo of [infra.por_localizacao, infra.por_dependencia]) {
+    for (const [ano, sub] of Object.entries(grupo || {})) {
+      if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) for (const v of Object.values(sub)) limparNo(v);
+    }
+  }
+  infra._climaCapped = true;
+}
+
 function renderInfra() {
   const infra = S.infra;
+  capClimatizacaoJV(infra);
   const doc = S.doc;
   const main = document.getElementById('main-content');
   destroyCharts();
@@ -2566,19 +2592,38 @@ function buildInfraKPIs(infra, ano, anos) {
     return su.indicadores[key]?.pct ?? null;
   };
 
+  // Ar Condicionado: fonte só é confiável até 2022 — usa o último ano com dado válido
+  let climaKpi = { label: 'Ar Condicionado', prevVal: suPrev?.indicadores?.IN_CLIMATIZACAO?.pct, val: getVal('IN_CLIMATIZACAO') };
+  if (JV_MODE) {
+    const anosClima = anos.filter(a => infra.serie_temporal[a]?.indicadores?.IN_CLIMATIZACAO?.pct != null);
+    if (anosClima.length) {
+      const yc = anosClima[anosClima.length - 1];
+      const idx = anos.indexOf(yc);
+      climaKpi = {
+        label: `Ar Condicionado (${yc})`,
+        prevVal: idx > 0 ? infra.serie_temporal[anos[idx - 1]]?.indicadores?.IN_CLIMATIZACAO?.pct : null,
+        val: infra.serie_temporal[yc].indicadores.IN_CLIMATIZACAO.pct,
+      };
+    }
+  }
+
   const kpis = [
     { label: 'Escolas', key: 'total_escolas', prevVal: suPrev?.total_escolas, icon: 'img/icons/escola.png', accent: 'green', fmt: 'num' },
     { label: 'Internet', key: 'IN_INTERNET', prevVal: suPrev?.indicadores?.IN_INTERNET?.pct, icon: 'img/icons/internet.png', accent: 'green', fmt: 'pct' },
     { label: 'Biblioteca', key: 'IN_BIBLIOTECA', prevVal: suPrev?.indicadores?.IN_BIBLIOTECA?.pct, icon: 'img/icons/biblioteca.png', accent: 'green', fmt: 'pct' },
     { label: 'Quadra', key: 'IN_QUADRA_ESPORTES', prevVal: suPrev?.indicadores?.IN_QUADRA_ESPORTES?.pct, icon: 'img/icons/quadra.png', accent: 'green', fmt: 'pct' },
     { label: 'Lab. Informática', key: 'IN_LABORATORIO_INFORMATICA', prevVal: suPrev?.indicadores?.IN_LABORATORIO_INFORMATICA?.pct, icon: 'img/icons/laboratorio.png', accent: 'green', fmt: 'pct' },
-    { label: 'Ar Condicionado', key: 'IN_CLIMATIZACAO', prevVal: suPrev?.indicadores?.IN_CLIMATIZACAO?.pct, icon: 'img/icons/ar_condicionado.png', accent: 'green', fmt: 'pct' },
-  ].map(k => ({ ...k, val: getVal(k.key, k.fmt) }));
+    { label: climaKpi.label, key: 'IN_CLIMATIZACAO', prevVal: climaKpi.prevVal, val: climaKpi.val, icon: 'img/icons/ar_condicionado.png', accent: 'green', fmt: 'pct' },
+  ].map(k => ({ ...k, val: k.val !== undefined ? k.val : getVal(k.key, k.fmt) }));
 
   // Build sparklines from historical data (only state-level)
   function buildSparkInfra(key, color) {
     if (munMode) return ''; // No sparkline for municipality
-    const vals = anos.map(a => {
+    // Climatização: só anos com dado válido (fonte falha a partir de 2023)
+    const yrs = key === 'IN_CLIMATIZACAO'
+      ? anos.filter(a => infra.serie_temporal[a]?.indicadores?.IN_CLIMATIZACAO?.pct != null)
+      : anos;
+    const vals = yrs.map(a => {
       if (key === 'total_escolas') return infra.serie_temporal[a]?.[key] || 0;
       return infra.serie_temporal[a]?.indicadores?.[key]?.pct || 0;
     });
@@ -2669,8 +2714,8 @@ function buildInfraChart(infra, anoComp, catKey, anoBase) {
 
   const barLabels = allCols.map(c => labels[c] || c);
   // Current data: use municipality if available, else state-level
-  const dataAtual = allCols.map(c => munSu ? (munSu.indicadores?.[c]?.pct || 0) : (su.indicadores[c]?.pct || 0));
-  const dataBase = allCols.map(c => suBase?.indicadores?.[c]?.pct || 0);
+  const dataAtual = allCols.map(c => munSu ? (munSu.indicadores?.[c]?.pct ?? null) : (su.indicadores[c]?.pct ?? null));
+  const dataBase = allCols.map(c => suBase?.indicadores?.[c]?.pct ?? null);
 
   S.charts.push(new Chart(el, {
     type: 'bar',
@@ -2715,12 +2760,15 @@ function buildInfraChart(infra, anoComp, catKey, anoBase) {
           }
         } },
         datalabels: {
-          display: (ctx) => ctx.datasetIndex === 1,
+          display: (ctx) => ctx.datasetIndex === 1 && ctx.dataset.data[ctx.dataIndex] != null,
           anchor: 'end', align: 'top', offset: 2,
           font: { family: 'Inter', size: 9, weight: '600' },
           color: '#333',
           formatter: (v, ctx) => {
-            const delta = v - ctx.chart.data.datasets[0].data[ctx.dataIndex];
+            if (v == null) return '';
+            const base = ctx.chart.data.datasets[0].data[ctx.dataIndex];
+            if (base == null) return `${v.toFixed(0)}%`;
+            const delta = v - base;
             const sign = delta >= 0 ? '+' : '';
             return `${v.toFixed(0)}% (${sign}${delta.toFixed(0)}pp)`;
           }
@@ -6711,19 +6759,19 @@ function renderInse() {
     <!-- ═══ EIXO: Mapa + Tabela ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_mapa.png" alt=""></span>
-      <span class="section-divider-text">Mapa e Tabela Municipal — INSE (${anoAtual})</span>
+      <span class="section-divider-text">Mapa e Tabela ${JV_MODE ? 'por Escola' : 'Municipal'} — INSE (${anoAtual})</span>
       <span class="section-divider-line"></span>
     </div>
 
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="chart-card" style="min-height:400px">
         <div class="chart-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          INSE Médio por Município
-          <div class="map-layer-toggle">
+          INSE Médio ${JV_MODE ? 'por Escola' : 'por Município'}
+          ${JV_MODE ? '' : `<div class="map-layer-toggle">
             <button class="map-layer-btn active" id="inse-btn-layer-mun">Municípios</button>
             <button class="map-layer-btn" id="inse-btn-layer-cre">CREs</button>
             ${S.escolasData ? '<button class="map-layer-btn" id="inse-btn-layer-escola">Escolas</button>' : ''}
-          </div>
+          </div>`}
         </div>
         <div id="inse-map-leaflet" style="height:380px;border-radius:8px"></div>
         <div class="chart-source">${FONTE_INSE}</div>
@@ -6968,6 +7016,9 @@ function renderInse() {
     S.map = L.map('inse-map-leaflet', { zoomControl: true, scrollWheelZoom: true, attributionControl: false })
       .setView(MAP_VIEW.center, MAP_VIEW.zoom);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 14 }).addTo(S.map);
+
+    // Joinville: recorte municipal único — INSE por escola (pontos), sem coropleto
+    if (JV_MODE) { addJoinvilleContour(); inseBuildEscolaLayer(); return; }
 
     // Info panel
     const info = L.control({ position: 'topright' });
@@ -7235,11 +7286,11 @@ function renderInse() {
   inseBuildStackedChart();
   inseBuildUrbanRuralDetail();
   inseBuildMap();
-  inseBuildMunTable();
+  if (!JV_MODE) inseBuildMunTable();
   injectExportButtons();
 
   // ── Escola layer for INSE map ──
-  const inseBuildEscolaLayer = () => {
+  function inseBuildEscolaLayer() {
     if (!S.escolasData?.escolas || !S.map) return;
     if (S.mapLayer) { S.mapLayer.remove(); S.mapLayer = null; }
     if (S.mapLegend) { S.mapLegend.remove(); S.mapLegend = null; }
@@ -7342,7 +7393,7 @@ function renderInse() {
     };
     legend.addTo(S.map);
     S.mapLegend = legend;
-  };
+  }
 
   // Bind INSE map layer toggle
   const inseBtnMun = document.getElementById('inse-btn-layer-mun');
@@ -7594,7 +7645,7 @@ function renderIcg() {
 
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
       <div class="chart-card">
-        <div class="chart-title">Nível Médio — Urbana vs Rural <span class="badge-estadual">Nível Estadual</span></div>
+        <div class="chart-title">Nível Médio — Urbana vs Rural${JV_MODE ? '' : ' <span class="badge-estadual">Nível Estadual</span>'}</div>
         <div style="height:220px"><canvas id="icg-chart-urbrur"></canvas></div>
         <div class="chart-source">${FONTE_ICG}</div>
       </div>
@@ -10063,18 +10114,20 @@ function buildIntegralPct(d) {
   const intAnos = Object.keys(d.integral || {}).sort();
   if (intAnos.length === 0) return;
 
-  // Series config
-  const seriesConfig = [
+  // Series config — Joinville: rede municipal não tem Ensino Médio
+  const seriesConfig = JV_MODE ? [
+    { key: 'fundamental', label: 'Fundamental', color: COLORS.fundAI },
+  ] : [
     { key: 'agregado', label: 'Fund. + Médio', color: '#003866' },
     { key: 'fundamental', label: 'Fundamental', color: COLORS.fundAI },
     { key: 'medio', label: 'Médio', color: COLORS.medio || '#FF6F00' },
   ];
-  const activeSeries = new Set(['agregado']);
+  const activeSeries = new Set([JV_MODE ? 'fundamental' : 'agregado']);
 
   // Build filter checkboxes
   filtersEl.innerHTML = seriesConfig.map(s => `
-    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:2px 6px;border-radius:4px;border:1.5px solid ${s.color};background:${s.color}15${s.key === 'agregado' ? '' : ';opacity:.4'}">
-      <input type="checkbox" data-int-series="${s.key}" ${s.key === 'agregado' ? 'checked' : ''} style="accent-color:${s.color};width:12px;height:12px">
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:2px 6px;border-radius:4px;border:1.5px solid ${s.color};background:${s.color}15${activeSeries.has(s.key) ? '' : ';opacity:.4'}">
+      <input type="checkbox" data-int-series="${s.key}" ${activeSeries.has(s.key) ? 'checked' : ''} style="accent-color:${s.color};width:12px;height:12px">
       <span style="color:${s.color};font-weight:600">${s.label}</span>
     </label>
   `).join('');
