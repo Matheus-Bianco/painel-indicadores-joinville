@@ -10270,7 +10270,21 @@ function buildLocDif() {
 function buildPorSerie(d, anoSel) {
   // Get data source considering geo-filters (municipality > CRE > state)
   let ps = null;
-  if (S.munSel) {
+  if (JV_MODE && S.ftl?.funil_por_serie) {
+    // Joinville: matrículas por série vêm do funil (4_1_funil_turma_locdif.json)
+    const fps = S.ftl.funil_por_serie;
+    const f = fps[anoSel];
+    if (f) {
+      const SERIE_MAP = {
+        QT_MAT_FUND_AI_1: '1_ano', QT_MAT_FUND_AI_2: '2_ano', QT_MAT_FUND_AI_3: '3_ano',
+        QT_MAT_FUND_AI_4: '4_ano', QT_MAT_FUND_AI_5: '5_ano', QT_MAT_FUND_AF_6: '6_ano',
+        QT_MAT_FUND_AF_7: '7_ano', QT_MAT_FUND_AF_8: '8_ano', QT_MAT_FUND_AF_9: '9_ano',
+        QT_MAT_MED_PROP_1: 'em_1', QT_MAT_MED_PROP_2: 'em_2', QT_MAT_MED_PROP_3: 'em_3', QT_MAT_MED_PROP_4: 'em_4',
+      };
+      ps = {};
+      for (const [qt, fk] of Object.entries(SERIE_MAP)) ps[qt] = f[fk] || 0;
+    }
+  } else if (S.munSel) {
     ps = d.por_municipio?.[anoSel]?.[S.munSel]?.por_serie;
   } else if (S.creSel) {
     // Aggregate por_serie across CRE municipalities
@@ -10495,7 +10509,10 @@ function buildProfissional(d, anos, anoSel) {
 function buildTurnoEtapa(d, anoSel) {
   // Get data source considering geo-filters
   let pt = null;
-  if (S.munSel) {
+  if (JV_MODE && S.ftl?.por_turno) {
+    // Joinville: turno por etapa vem do funil (disponível a partir de 2025)
+    pt = S.ftl.por_turno[anoSel] || null;
+  } else if (S.munSel) {
     pt = d.por_municipio?.[anoSel]?.[S.munSel]?.por_turno;
   } else if (S.creSel) {
     const creMuns = getCreMuns(S.creSel);
@@ -10517,7 +10534,7 @@ function buildTurnoEtapa(d, anoSel) {
   const c = document.getElementById('chart-turno-etapa');
   if (!c) return;
   if (!pt) {
-    c.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:280px;color:#999;font-size:12px">Dados indisponíveis para ${anoSel}</div>`;
+    c.parentElement.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:280px;color:#888;font-size:12px;text-align:center;gap:6px"><span>Desagregação Diurno vs Noturno por etapa<br>disponível apenas a partir de <strong>2025</strong></span><span style="font-size:10px;color:#aaa">Censo Escolar INEP — Tabela de Matrículas</span></div>`;
     return;
   }
 

@@ -43,8 +43,99 @@ TURMA_PAIRS = [
     ("EJA",               "QT_MAT_EJA",     "QT_TUR_EJA"),
 ]
 
+# Matriculas por turno (Diurno vs Noturno) por etapa.
+# Disponivel apenas no formato novo do Censo (2025+).
+TURNO_COLS = [
+    "QT_MAT_FUND_AI_D", "QT_MAT_FUND_AI_N",
+    "QT_MAT_FUND_AF_D", "QT_MAT_FUND_AF_N",
+    "QT_MAT_EJA_D", "QT_MAT_EJA_N",
+]
+
 LOC_DIF_MAP = {0: "Nenhuma", 1: "Area de Assentamento", 2: "Terra Indigena",
                3: "Quilombola", 4: "Unidade de Conservacao", 5: "Comunidade Remanescente"}
+
+def processar_2025(resultado):
+    """2025 usa o formato novo do Censo (tabelas separadas).
+    Junta Escola + Matricula + Turma por CO_ENTIDADE, filtra Joinville/municipal."""
+    ano = "2025"
+    print(f"\n  {ano} (formato novo)...", end=" ", flush=True)
+    t1 = time.time()
+
+    f_escola = os.path.join(MICRO_DIR, "Tabela_Escola_2025.csv")
+    f_mat = os.path.join(MICRO_DIR, "Tabela_Matricula_2025.csv")
+    f_tur = os.path.join(MICRO_DIR, "Tabela_Turma_2025.csv")
+    if not (os.path.exists(f_escola) and os.path.exists(f_mat)):
+        print("tabelas 2025 nao encontradas — pulando")
+        return
+
+    # 1. Escola: filtro Joinville + ativas + rede municipal (dep=3)
+    esc_cols = ["CO_MUNICIPIO", "CO_ENTIDADE", "TP_DEPENDENCIA",
+                "TP_SITUACAO_FUNCIONAMENTO", "TP_LOCALIZACAO_DIFERENCIADA"]
+    h_esc = list(pd.read_csv(f_escola, sep=";", encoding="latin-1", nrows=0).columns)
+    esc_use = [c for c in esc_cols if c in h_esc]
+    df_esc = pd.read_csv(f_escola, sep=";", encoding="latin-1", usecols=esc_use)
+    df_esc = df_esc[(df_esc["CO_MUNICIPIO"] == CO_MUN_JOINVILLE) &
+                    (df_esc["TP_SITUACAO_FUNCIONAMENTO"] == 1) &
+                    (df_esc["TP_DEPENDENCIA"] == 3)]
+    entidades = set(df_esc["CO_ENTIDADE"].unique())
+
+    # 2. Matricula: funil por serie + turno por etapa
+    funil_cols = {k: v for k, v in FUNIL_COLS.items()}
+    h_mat = list(pd.read_csv(f_mat, sep=";", encoding="latin-1", nrows=0).columns)
+    funil_avail = {k: v for k, v in funil_cols.items() if v in h_mat}
+    turno_avail = [c for c in TURNO_COLS if c in h_mat]
+    mat_turma_cols = [mc for _, mc, _ in TURMA_PAIRS if mc in h_mat]
+    mat_use = (["CO_ENTIDADE"] + list(funil_avail.values()) + turno_avail
+               + [c for c in mat_turma_cols if c not in funil_avail.values()])
+    mat_use = list(dict.fromkeys(mat_use))
+    df_mat = pd.read_csv(f_mat, sep=";", encoding="latin-1", usecols=mat_use)
+    df_mat = df_mat[df_mat["CO_ENTIDADE"].isin(entidades)]
+
+    if funil_avail:
+        resultado["funil_por_serie"][ano] = {s: si(df_mat[c].sum()) for s, c in funil_avail.items()}
+        print(f"funil={len(funil_avail)}", end="  ", flush=True)
+    if turno_avail:
+        resultado["por_turno"][ano] = {c: si(df_mat[c].sum()) for c in turno_avail}
+        print(f"turno={len(turno_avail)}", end="  ", flush=True)
+
+    # 3. Tamanho de turma (Matricula QT_MAT_* + Turma QT_TUR_*)
+    if os.path.exists(f_tur):
+        h_tur = list(pd.read_csv(f_tur, sep=";", encoding="latin-1", nrows=0).columns)
+        tur_cols = [tc for _, _, tc in TURMA_PAIRS if tc in h_tur]
+        df_tur = pd.read_csv(f_tur, sep=";", encoding="latin-1",
+                             usecols=["CO_ENTIDADE"] + tur_cols)
+        df_tur = df_tur[df_tur["CO_ENTIDADE"].isin(entidades)]
+        df_mat_full = pd.read_csv(f_mat, sep=";", encoding="latin-1",
+                                  usecols=["CO_ENTIDADE"] + mat_turma_cols)
+        df_mat_full = df_mat_full[df_mat_full["CO_ENTIDADE"].isin(entidades)]
+        turma_data = {}
+        for label, mat_col, tur_col in TURMA_PAIRS:
+            if mat_col in h_mat and tur_col in h_tur:
+                mat_total = si(df_mat_full[mat_col].sum())
+                tur_total = si(df_tur[tur_col].sum())
+                media = round(mat_total / tur_total, 1) if tur_total > 0 else None
+                turma_data[label] = {"matriculas": mat_total, "turmas": tur_total, "media_alunos": media}
+        if turma_data:
+            resultado["tamanho_turma"][ano] = turma_data
+            print(f"turma={len(turma_data)}", end="  ", flush=True)
+
+    # 4. Localizacao diferenciada
+    if "TP_LOCALIZACAO_DIFERENCIADA" in df_esc.columns and "QT_MAT_BAS" in h_mat:
+        df_bas = pd.read_csv(f_mat, sep=";", encoding="latin-1", usecols=["CO_ENTIDADE", "QT_MAT_BAS"])
+        df_loc = df_esc.merge(df_bas[df_bas["CO_ENTIDADE"].isin(entidades)], on="CO_ENTIDADE", how="left")
+        loc_data = {}
+        for cod, nome in LOC_DIF_MAP.items():
+            mask = df_loc["TP_LOCALIZACAO_DIFERENCIADA"] == cod
+            if mask.any():
+                loc_data[nome] = {"escolas": int(mask.sum()),
+                                  "matriculas": si(df_loc.loc[mask, "QT_MAT_BAS"].sum())}
+        if "Nenhuma" in loc_data:
+            loc_data["Nenhuma (urbana/rural regular)"] = loc_data.pop("Nenhuma")
+        if loc_data:
+            resultado["localizacao_diferenciada"][ano] = loc_data
+
+    print(f"  ({time.time()-t1:.1f}s)")
+
 
 def etl_funil_turma_locdif():
     print("=" * 60)
@@ -57,6 +148,7 @@ def etl_funil_turma_locdif():
                      "gerado_em": pd.Timestamp.now().isoformat()},
         "funil_por_serie": {},      # ano -> {serie: total}
         "tamanho_turma": {},        # ano -> {etapa: {mat, tur, media}}
+        "por_turno": {},            # ano -> {QT_MAT_*_D/N: total} (2025+)
         "localizacao_diferenciada": {},  # ano -> {tipo: {escolas, matriculas}}
     }
 
@@ -82,6 +174,9 @@ def etl_funil_turma_locdif():
                 turma_avail.append((label, mat_col, tur_col))
                 if mat_col not in need: need.append(mat_col)
                 if tur_col not in need: need.append(tur_col)
+
+        turno_avail = [c for c in TURNO_COLS if c in header]
+        need += [c for c in turno_avail if c not in need]
 
         has_loc_dif = "TP_LOCALIZACAO_DIFERENCIADA" in header
         if has_loc_dif and "TP_LOCALIZACAO_DIFERENCIADA" not in need:
@@ -113,6 +208,12 @@ def etl_funil_turma_locdif():
         resultado["tamanho_turma"][ano] = turma_data
         print(f"turma={len(turma_avail)} etapas", end="  ", flush=True)
 
+        # 2b. Matriculas por turno por etapa (so anos com as colunas — 2025+)
+        if turno_avail:
+            turno = {c: si(df[c].sum()) for c in turno_avail}
+            resultado["por_turno"][ano] = turno
+            print(f"turno={len(turno_avail)} cols", end="  ", flush=True)
+
         # 3. Localizacao diferenciada
         if has_loc_dif:
             loc_data = {}
@@ -130,6 +231,9 @@ def etl_funil_turma_locdif():
             print(f"loc_dif={dif_count} escolas diferenciadas", end="", flush=True)
 
         print(f"  ({time.time()-t1:.1f}s)")
+
+    # 2025 vem no formato novo (Tabela_Escola/Matricula/Turma)
+    processar_2025(resultado)
 
     # Save
     out = os.path.join(OUT_DIR, "4_1_funil_turma_locdif.json")

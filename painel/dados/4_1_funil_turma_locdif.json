@@ -4,7 +4,7 @@
     "uf": "SC",
     "municipio": "Joinville",
     "rede": "municipal",
-    "gerado_em": "2026-06-14T18:57:50.836972"
+    "gerado_em": "2026-06-16T10:28:32.714222"
   },
   "funil_por_serie": {
     "2023": {
@@ -32,6 +32,21 @@
       "7_ano": 5658,
       "8_ano": 5628,
       "9_ano": 5005,
+      "em_1": 0,
+      "em_2": 0,
+      "em_3": 0,
+      "em_4": 0
+    },
+    "2025": {
+      "1_ano": 6271,
+      "2_ano": 6304,
+      "3_ano": 6205,
+      "4_ano": 6744,
+      "5_ano": 6589,
+      "6_ano": 5538,
+      "7_ano": 5693,
+      "8_ano": 5726,
+      "9_ano": 5279,
       "em_1": 0,
       "em_2": 0,
       "em_3": 0,
@@ -518,6 +533,48 @@
         "turmas": 50,
         "media_alunos": 13.4
       }
+    },
+    "2025": {
+      "Educacao Basica": {
+        "matriculas": 74997,
+        "turmas": 3514,
+        "media_alunos": 21.3
+      },
+      "Ed. Infantil": {
+        "matriculas": 19999,
+        "turmas": 1606,
+        "media_alunos": 12.5
+      },
+      "Fund. Anos Iniciais": {
+        "matriculas": 32113,
+        "turmas": 1136,
+        "media_alunos": 28.3
+      },
+      "Fund. Anos Finais": {
+        "matriculas": 22236,
+        "turmas": 728,
+        "media_alunos": 30.5
+      },
+      "Ens. Medio": {
+        "matriculas": 0,
+        "turmas": 0,
+        "media_alunos": null
+      },
+      "EJA": {
+        "matriculas": 649,
+        "turmas": 44,
+        "media_alunos": 14.8
+      }
+    }
+  },
+  "por_turno": {
+    "2025": {
+      "QT_MAT_FUND_AI_D": 32113,
+      "QT_MAT_FUND_AI_N": 0,
+      "QT_MAT_FUND_AF_D": 22236,
+      "QT_MAT_FUND_AF_N": 0,
+      "QT_MAT_EJA_D": 83,
+      "QT_MAT_EJA_N": 566
     }
   },
   "localizacao_diferenciada": {
@@ -633,6 +690,12 @@
       "Nenhuma (urbana/rural regular)": {
         "escolas": 162,
         "matriculas": 74259
+      }
+    },
+    "2025": {
+      "Nenhuma (urbana/rural regular)": {
+        "escolas": 162,
+        "matriculas": 74997
       }
     }
   }
