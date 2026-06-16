@@ -249,6 +249,75 @@ def extract_medias(df, ano):
     return result
 
 
+def parse_municipio_row(row):
+    """Extrai medias 5EF/9EF/EM de uma linha de planilha de resultados
+    por municipio (formato TS_MUNICIPIO ou Resultados_Saeb .xlsb)."""
+    entry = {}
+    lp5 = pd.to_numeric(row.get('MEDIA_5_LP', None), errors='coerce')
+    mt5 = pd.to_numeric(row.get('MEDIA_5_MT', None), errors='coerce')
+    if pd.notna(lp5):
+        entry['5EF'] = {'media_lp': round(float(lp5), 1), 'media_mt': round(float(mt5), 1) if pd.notna(mt5) else None}
+    lp9 = pd.to_numeric(row.get('MEDIA_9_LP', None), errors='coerce')
+    mt9 = pd.to_numeric(row.get('MEDIA_9_MT', None), errors='coerce')
+    if pd.notna(lp9):
+        entry['9EF'] = {'media_lp': round(float(lp9), 1), 'media_mt': round(float(mt9), 1) if pd.notna(mt9) else None}
+    for em_lp_col, em_mt_col in [('MEDIA_12_LP', 'MEDIA_12_MT'), ('MEDIA_3_LP', 'MEDIA_3_MT'),
+                                 ('MEDIA_EM_LP', 'MEDIA_EM_MT'), ('MEDIA_EMT_LP', 'MEDIA_EMT_MT')]:
+        lp_em = pd.to_numeric(row.get(em_lp_col, None), errors='coerce')
+        mt_em = pd.to_numeric(row.get(em_mt_col, None), errors='coerce')
+        if pd.notna(lp_em):
+            entry['EM'] = {'media_lp': round(float(lp_em), 1), 'media_mt': round(float(mt_em), 1) if pd.notna(mt_em) else None}
+            break
+    return entry
+
+
+def ler_resultados_xlsb(por_municipio, lookup_municipios):
+    """Le as planilhas oficiais 'Resultados_Saeb_AAAA_..._Municipios.xlsb' (2023+),
+    que trazem CO_MUNICIPIO (IBGE) e NO_MUNICIPIO — formato adotado pelo INEP a
+    partir de 2023, em substituicao ao TS_MUNICIPIO.xlsx."""
+    xlsb_files = glob.glob(os.path.join(SAEB_DIR, "**", "Resultados_Saeb_*.xlsb"), recursive=True)
+    for xf in sorted(xlsb_files):
+        try:
+            xl = pd.ExcelFile(xf, engine='pyxlsb')
+            sheet = next((s for s in xl.sheet_names if 'unic' in s.lower()), None)
+            if not sheet:
+                continue
+            mdf = pd.read_excel(xf, sheet_name=sheet, engine='pyxlsb', header=0)
+        except Exception as e:
+            print(f"    ERRO xlsb {os.path.basename(xf)}: {e}")
+            continue
+        if 'CO_MUNICIPIO' not in mdf.columns:
+            print(f"    SKIP {os.path.basename(xf)}: sem CO_MUNICIPIO")
+            continue
+
+        # Filtra Joinville
+        mdf = mdf[pd.to_numeric(mdf['CO_MUNICIPIO'], errors='coerce') == CO_MUN_JOINVILLE]
+        # Rede municipal; fallback para o total do municipio
+        if 'DEPENDENCIA_ADM' in mdf.columns:
+            mun = mdf[mdf['DEPENDENCIA_ADM'] == 'Municipal']
+            mdf = mun if len(mun) > 0 else mdf[mdf['DEPENDENCIA_ADM'].astype(str).str.startswith('Total')]
+        if 'LOCALIZACAO' in mdf.columns:
+            loc_total = mdf[mdf['LOCALIZACAO'] == 'Total']
+            if len(loc_total) > 0:
+                mdf = loc_total
+
+        for _, row in mdf.iterrows():
+            yr = pd.to_numeric(row.get('ANO_SAEB', None), errors='coerce')
+            if pd.isna(yr):
+                continue
+            yr = str(int(yr))
+            entry = parse_municipio_row(row)
+            if not entry:
+                continue
+            cod = str(CO_MUN_JOINVILLE)
+            por_municipio.setdefault(yr, {})
+            por_municipio[yr].setdefault(cod, {}).update(entry)
+            nome = str(row.get('NO_MUNICIPIO', 'Joinville'))
+            if nome and nome != 'nan':
+                lookup_municipios[cod] = nome
+            print(f"    Resultados xlsb {yr}: Joinville Municipal -> {list(entry.keys())}")
+
+
 def main():
     t0 = time.time()
     print("=" * 60)
@@ -444,7 +513,10 @@ def main():
                     print(f"    TS_MUNICIPIO {yr_digits}: {len(mun_data)} municipios")
             except Exception as e:
                 print(f"    ERRO TS_MUNICIPIO {mf}: {e}")
-        
+
+        # Planilhas oficiais .xlsb (2023+): CO_MUNICIPIO/NO_MUNICIPIO reais
+        ler_resultados_xlsb(por_municipio, lookup_municipios)
+
         resultado["por_municipio"] = por_municipio
         resultado["lookup_municipios"] = lookup_municipios
 

@@ -2,7 +2,7 @@
   "metadata": {
     "fonte": "Microdados SAEB/INEP",
     "recorte": "Rede Municipal RS",
-    "gerado_em": "2026-06-14T19:06:59.602444"
+    "gerado_em": "2026-06-16T11:13:15.978814"
   },
   "serie_temporal": {
     "2017": {
@@ -38,6 +38,18 @@
       "9EF": {
         "media_lp": 281.0,
         "media_mt": 282.4,
+        "label": "9º Ano EF"
+      }
+    },
+    "2023": {
+      "5EF": {
+        "media_lp": 234.7,
+        "media_mt": 252.1,
+        "label": "5º Ano EF"
+      },
+      "9EF": {
+        "media_lp": 283.1,
+        "media_mt": 285.4,
         "label": "9º Ano EF"
       }
     }
@@ -76,6 +88,18 @@
         "9EF": {
           "media_lp": 281.0,
           "media_mt": 282.4
+        }
+      }
+    },
+    "2023": {
+      "4209102": {
+        "5EF": {
+          "media_lp": 234.7,
+          "media_mt": 252.1
+        },
+        "9EF": {
+          "media_lp": 283.1,
+          "media_mt": 285.4
         }
       }
     }
