@@ -547,6 +547,29 @@ body.sidebar-hidden .sidebar {
   border-color: var(--accent);
   background: rgba(255,255,255,.18);
 }
+
+/* Destaque do filtro de Ano (recorte municipal único — Joinville) */
+.banner-filter-ano-hl {
+  background: rgba(255,203,4,.14);
+  border: 1.5px solid var(--accent);
+  border-radius: 9px;
+  padding: 4px 12px 6px;
+  animation: anoFilterGlow 2.6s ease-in-out 3;
+}
+.banner-filter-ano-hl .banner-filter-label {
+  color: var(--accent);
+  font-size: 9px;
+}
+.banner-filter-ano-hl .banner-filter-select {
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,203,4,.55);
+  font-weight: 700;
+  min-width: 96px;
+}
+@keyframes anoFilterGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,203,4,0); }
+  50% { box-shadow: 0 0 0 4px rgba(255,203,4,.28); }
+}
 .banner-filter-select option {
   background: #003866;
   color: #fff;

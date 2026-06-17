@@ -106,5 +106,91 @@
   },
   "lookup_municipios": {
     "4209102": "Joinville"
+  },
+  "referencias": {
+    "sc_municipal": {
+      "2017": {
+        "5EF": {
+          "media_lp": 227.4,
+          "media_mt": 236.9
+        },
+        "9EF": {
+          "media_lp": 270.1,
+          "media_mt": 271.8
+        }
+      },
+      "2019": {
+        "5EF": {
+          "media_lp": 226.3,
+          "media_mt": 238.6
+        },
+        "9EF": {
+          "media_lp": 270.3,
+          "media_mt": 275.6
+        }
+      },
+      "2021": {
+        "5EF": {
+          "media_lp": 221.6,
+          "media_mt": 230.6
+        },
+        "9EF": {
+          "media_lp": 266.9,
+          "media_mt": 268.7
+        }
+      },
+      "2023": {
+        "5EF": {
+          "media_lp": 223.0,
+          "media_mt": 233.8
+        },
+        "9EF": {
+          "media_lp": 267.5,
+          "media_mt": 267.2
+        }
+      }
+    },
+    "brasil_municipal": {
+      "2017": {
+        "5EF": {
+          "media_lp": 207.1,
+          "media_mt": 216.6
+        },
+        "9EF": {
+          "media_lp": 248.1,
+          "media_mt": 246.6
+        }
+      },
+      "2019": {
+        "5EF": {
+          "media_lp": 207.3,
+          "media_mt": 220.7
+        },
+        "9EF": {
+          "media_lp": 250.8,
+          "media_mt": 252.6
+        }
+      },
+      "2021": {
+        "5EF": {
+          "media_lp": 199.6,
+          "media_mt": 208.3
+        },
+        "9EF": {
+          "media_lp": 248.7,
+          "media_mt": 246.1
+        }
+      },
+      "2023": {
+        "5EF": {
+          "media_lp": 206.6,
+          "media_mt": 217.3
+        },
+        "9EF": {
+          "media_lp": 250.0,
+          "media_mt": 247.6
+        }
+      }
+    }
   }
 }

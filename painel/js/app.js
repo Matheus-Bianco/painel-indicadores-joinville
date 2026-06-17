@@ -479,8 +479,8 @@ function sectionBanner(icon, title, subtitle, opts = {}) {
       </div>
       <div class="section-banner-right" style="flex-direction:column;align-items:flex-end;gap:4px">
         <div class="banner-filters">
-          <div class="banner-filter-group">
-            <label class="banner-filter-label">Ano</label>
+          <div class="banner-filter-group${JV_MODE ? ' banner-filter-ano-hl' : ''}">
+            <label class="banner-filter-label">${JV_MODE ? 'Ano de referência' : 'Ano'}</label>
             <select id="sel-ano" class="banner-filter-select"></select>
           </div>
           ${JV_MODE ? '' : `
@@ -3995,6 +3995,7 @@ function renderSaeb() {
       </div>
     </div>
 
+    ${JV_MODE ? '' : `
     <!-- ═══ EIXO: Participação ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_infra.png" alt=""></span>
@@ -4008,7 +4009,7 @@ function renderSaeb() {
         <div style="height:200px"><canvas id="chart-saeb-escolas"></canvas></div>
         <div class="chart-source">${FONTE_SAEB}</div>
       </div>
-    </div>
+    </div>`}
   `;
 
   // ── Build SAEB KPIs ──
@@ -4108,9 +4109,31 @@ function renderSaeb() {
         spanGaps: true,
       };
     });
+
+    // Referências: médias das redes municipais (SC e Brasil) — ocultas por padrão (toggle na legenda)
+    const refData = saeb.referencias;
+    const refDatasets = [];
+    if (JV_MODE && refData) {
+      const refScopes = [
+        { key: 'sc_municipal', label: 'SC munic.', dash: [7, 4] },
+        { key: 'brasil_municipal', label: 'Brasil munic.', dash: [2, 3] },
+      ];
+      etapas.forEach((et, i) => {
+        refScopes.forEach(sc => {
+          refDatasets.push({
+            label: `${etapaLabels[i]} — ${sc.label} (ref.)`,
+            data: anos.map(a => refData[sc.key]?.[a]?.[et]?.[field] ?? null),
+            borderColor: etapaCores[i], borderDash: sc.dash, borderWidth: 1.6,
+            pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, hidden: true,
+            datalabels: { display: false },
+          });
+        });
+      });
+    }
+
     S.charts.push(new Chart(el, {
       type: 'line',
-      data: { labels: anos, datasets },
+      data: { labels: anos, datasets: [...datasets, ...refDatasets] },
       options: {
         ...CHART_DEFAULTS,
         layout: { padding: { top: 28 } },
@@ -4818,7 +4841,7 @@ function renderIdeb() {
           <p style="font-size:9px;margin:8px 0 0;color:#999;line-height:1.5;font-style:italic">
             * Classificação adotada para fins de visualização — não corresponde a faixas oficiais do INEP.
           </p>
-          <div style="margin-top:14px;background:rgba(29,113,185,.06);border:1px solid rgba(29,113,185,.15);border-radius:6px;padding:10px 14px">
+          ${JV_MODE ? '' : `<div style="margin-top:14px;background:rgba(29,113,185,.06);border:1px solid rgba(29,113,185,.15);border-radius:6px;padding:10px 14px">
             <p style="font-size:11px;margin:0 0 8px;color:#003866;line-height:1.7">
               <strong>Metas SEDUC-RS (próximas edições):</strong>
             </p>
@@ -4869,12 +4892,17 @@ function renderIdeb() {
           </div>
           <div style="margin-top:8px;background:rgba(255,203,4,.08);border:1px solid rgba(255,203,4,.18);border-radius:6px;padding:8px 14px">
             <p style="font-size:10px;margin:0;color:#5D4037;line-height:1.7">
-              <strong>Metas do PNE:</strong> AI: <strong>6,0</strong> · AF: <strong>5,5</strong>${JV_MODE ? '' : ' · EM: <strong>5,2</strong>'}<br>
+              <strong>Metas do PNE:</strong> AI: <strong>6,0</strong> · AF: <strong>5,5</strong> · EM: <strong>5,2</strong><br>
               <strong>Linha tracejada</strong> nos gráficos = <strong>meta projetada pela SEDUC-RS</strong> para cada edição.
             </p>
-          </div>
+          </div>`}
+          ${JV_MODE ? `<div style="margin-top:14px;background:rgba(29,113,185,.06);border:1px solid rgba(29,113,185,.15);border-radius:6px;padding:10px 14px">
+            <p style="font-size:11px;margin:0;color:#003866;line-height:1.7">
+              <strong>Metas do PNE (referência nacional):</strong> Anos Iniciais <strong>6,0</strong> · Anos Finais <strong>5,5</strong>
+            </p>
+          </div>` : ''}
           <p style="font-size:9px;margin:10px 0 0;color:#999;line-height:1.5;font-style:italic">
-            Fontes: INEP — Nota Técnica do IDEB; PNE — Lei nº 13.005/2014 (Meta 7); SEDUC-RS — Projeção de metas.
+            ${JV_MODE ? 'Fontes: INEP — Nota Técnica do IDEB; PNE — Lei nº 13.005/2014 (Meta 7).' : 'Fontes: INEP — Nota Técnica do IDEB; PNE — Lei nº 13.005/2014 (Meta 7); SEDUC-RS — Projeção de metas.'}
           </p>
         </div>
       </div>
@@ -4889,7 +4917,7 @@ function renderIdeb() {
 
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
       <div class="chart-card">
-        <div class="chart-title">IDEB Observado × Meta SEDUC-RS — ${geoLabel}</div>
+        <div class="chart-title">${JV_MODE ? 'IDEB — Evolução por Etapa' : 'IDEB Observado × Meta SEDUC-RS'} — ${geoLabel}</div>
         <div style="height:360px"><canvas id="chart-ideb-evolucao"></canvas></div>
         <div class="chart-source">${FONTE_IDEB}</div>
       </div>
@@ -5003,7 +5031,9 @@ function renderIdeb() {
   const elEvo = document.getElementById('chart-ideb-evolucao');
   if (elEvo) {
     // Extended labels: observed years + future SEDUC meta years (up to 2027)
-    const metaYears = isStateLevel ? ['2025', '2027'].filter(y => !anos.includes(y)) : [];
+    // Joinville: metas SEDUC-RS não se aplicam — não exibir
+    const showMetas = isStateLevel && !JV_MODE;
+    const metaYears = showMetas ? ['2025', '2027'].filter(y => !anos.includes(y)) : [];
     const chartLabels = [...anos, ...metaYears];
 
     const datasets = [];
@@ -5019,8 +5049,8 @@ function renderIdeb() {
         borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
         tension: .3, spanGaps: true,
       });
-      // Metas SEDUC (dashed line, at state level)
-      if (isStateLevel) {
+      // Metas SEDUC (dashed line, at state level) — não exibir em Joinville
+      if (showMetas) {
         const dataMeta = chartLabels.map(a => METAS_SEDUC[et]?.[parseInt(a)] ?? null);
         if (dataMeta.some(v => v != null)) {
           datasets.push({
@@ -5030,6 +5060,23 @@ function renderIdeb() {
             pointStyle: 'triangle', tension: .3, spanGaps: true,
           });
         }
+      }
+      // Referências: IDEB médio das redes municipais (SC e Brasil) — ocultas por padrão (toggle na legenda)
+      if (JV_MODE && ideb.referencias) {
+        const refScopes = [
+          { key: 'sc_municipal', label: 'SC munic.', dash: [7, 4] },
+          { key: 'brasil_municipal', label: 'Brasil munic.', dash: [2, 3] },
+        ];
+        refScopes.forEach(sc => {
+          datasets.push({
+            label: `${idebLabels[etIdx]} — ${sc.label} (ref.)`,
+            data: chartLabels.map(a => ideb.referencias[sc.key]?.[a]?.[et] ?? null),
+            _isMeta: true, _etIdx: etIdx, _isSeduc: false,
+            borderColor: idebCores[etIdx], borderDash: sc.dash, borderWidth: 1.6,
+            pointRadius: 0, tension: .3, spanGaps: true, hidden: true,
+            datalabels: { display: false },
+          });
+        });
       }
     });
     S.charts.push(new Chart(elEvo, {
@@ -5414,10 +5461,10 @@ function renderHome() {
 
         <div class="home-hero" style="margin-bottom:28px">
           <div class="home-hero-badge">${JV_MODE ? 'Secretaria de Educação de Joinville/SC' : 'Secretaria de Estado da Educação do Rio Grande do Sul'}</div>
-          <h1>Painel de <span>Indicadores Abertos</span></h1>
+          <h1>Painel de <span>${JV_MODE ? 'Dados' : 'Indicadores'} Abertos</span></h1>
           <p class="home-hero-sub">
             ${JV_MODE
-              ? 'Plataforma analítica com dados abertos do Censo Escolar, SAEB e indicadores educacionais da rede municipal de Joinville/SC'
+              ? 'Plataforma analítica com indicadores educacionais da rede municipal de Joinville/SC'
               : 'Plataforma analítica com dados abertos do Censo Escolar, SAEB e indicadores educacionais da rede estadual do Rio Grande do Sul'}
           </p>
         </div>
@@ -5442,10 +5489,10 @@ function renderHome() {
         </div>
 
         <div class="home-footer" style="margin-top:32px">
-          <div class="home-footer-text">
+          ${JV_MODE ? '' : `<div class="home-footer-text">
             Dados: INEP — Censo Escolar da Educação Básica & Microdados SAEB<br>
-            ${JV_MODE ? 'Secretaria de Educação de Joinville/SC' : 'Desenvolvido no âmbito do contrato UNESCO / SEDUC-RS'}
-          </div>
+            Desenvolvido no âmbito do contrato UNESCO / SEDUC-RS
+          </div>`}
           <div class="home-footer-logos">
             ${JV_MODE
               ? '<img src="img/logo_joinville.png" alt="Joinville" style="height:56px" onerror="this.style.display=\'none\'">'
@@ -5682,7 +5729,7 @@ function renderFluxo() {
           <table class="data-table" id="flx-escola-table">
             <thead><tr>
               ${JV_MODE
-                ? '<th>#</th><th>Escola</th><th>Aprovação Fund.</th><th>Reprovação Fund.</th><th>Abandono Fund.</th>'
+                ? '<th>#</th><th>Escola</th><th>Aprov. AI</th><th>Aprov. AF</th><th>Reprov. AI</th><th>Reprov. AF</th><th>Aband. AI</th><th>Aband. AF</th>'
                 : '<th>#</th><th>Escola</th><th>Município</th><th>Aprovação Fund.</th><th>Aprovação Médio</th><th>Reprovação Fund.</th><th>Reprovação Médio</th><th>Abandono Fund.</th><th>Abandono Médio</th>'}
             </tr></thead>
             <tbody></tbody>
@@ -5702,7 +5749,7 @@ function renderFluxo() {
     // Joinville: recorte municipal único — apenas mapa de pontos + tabela por escola (dados 2024)
     const mw = document.getElementById('flx-table-wrapper'); if (mw) mw.style.display = 'none';
     const ew = document.getElementById('flx-escola-wrapper'); if (ew) ew.style.display = '';
-    fluxoBuildEscMap(f, anoSel, 'aprov_fund');
+    fluxoBuildEscMap(f, anoSel, 'aprov_fund_ai');
   } else {
     buildFluxoMap(f, anoSel, 'aprov_fund');
     fluxoBuildMunTable(f, anoSel, lookup);
@@ -5878,7 +5925,7 @@ function fluxoBuildCharts(f, anos, anoSel, st, tdiSrc) {
       data: { labels: anosChart, datasets: aprovDatasets },
       options: {
         ...CHART_DEFAULTS,
-        layout: { padding: { top: 38 } },
+        layout: { padding: { top: JV_MODE ? 56 : 38 } },
         plugins: {
           ...CHART_DEFAULTS.plugins,
           legend: { display: false },
@@ -5901,7 +5948,7 @@ function fluxoBuildCharts(f, anos, anoSel, st, tdiSrc) {
         },
         scales: {
           ...CHART_DEFAULTS.scales,
-          y: { ...CHART_DEFAULTS.scales.y, min: 60, max: 100, grace: '5%' }
+          y: { ...CHART_DEFAULTS.scales.y, min: JV_MODE ? 90 : 60, max: 100, grace: '5%' }
         },
       },
     });
@@ -6023,7 +6070,9 @@ function fluxoBuildCharts(f, anos, anoSel, st, tdiSrc) {
         },
         scales: {
           ...CHART_DEFAULTS.scales,
-          y: { ...CHART_DEFAULTS.scales.y, min: 0, suggestedMax: 15, grace: '10%' }
+          y: JV_MODE
+            ? { ...CHART_DEFAULTS.scales.y, min: 0, max: 2, grace: 0 }
+            : { ...CHART_DEFAULTS.scales.y, min: 0, suggestedMax: 15, grace: '10%' }
         },
       },
     });
@@ -6522,10 +6571,9 @@ function fluxoBuildEscMap(f, anoSel, metricKey) {
       <tr style="cursor:pointer" data-lat="${e.lat}" data-lng="${e.lng}">
         <td>${i+1}</td>
         <td>${e.nome_escola}</td>
-        ${JV_MODE ? '' : `<td>${e.nome_mun}</td>`}
-        ${pctCell(e.aprov_fund, true)}${JV_MODE ? '' : pctCell(e.aprov_med, true)}
-        ${pctCell(e.reprov_fund, false)}${JV_MODE ? '' : pctCell(e.reprov_med, false)}
-        ${pctCell(e.aband_fund, false)}${JV_MODE ? '' : pctCell(e.aband_med, false)}
+        ${JV_MODE
+          ? `${pctCell(e.aprov_fund_ai, true)}${pctCell(e.aprov_fund_af, true)}${pctCell(e.reprov_fund_ai, false)}${pctCell(e.reprov_fund_af, false)}${pctCell(e.aband_fund_ai, false)}${pctCell(e.aband_fund_af, false)}`
+          : `<td>${e.nome_mun}</td>${pctCell(e.aprov_fund, true)}${pctCell(e.aprov_med, true)}${pctCell(e.reprov_fund, false)}${pctCell(e.reprov_med, false)}${pctCell(e.aband_fund, false)}${pctCell(e.aband_med, false)}`}
       </tr>
     `).join('');
 
@@ -6947,8 +6995,8 @@ function renderInse() {
             datalabels: { anchor: 'end', align: 'top' } },
           { label: 'Brasil (ref.)', data: anos.map(a => brasMedia[a] || null), borderColor: '#999', borderDash: [5, 5], tension: .3, pointRadius: 4, borderWidth: 2,
             datalabels: { anchor: 'start', align: 'bottom' }, hidden: true },
-          { label: 'RS Estadual (ref.)', data: anos.map(a => inse.serie_temporal[a]?.media), borderColor: '#B0BEC5', borderDash: [5, 5], tension: .3, pointRadius: 0, borderWidth: 2,
-            datalabels: { display: false }, hidden: (geoLabel === sectionSubtitle()) }
+          ...(JV_MODE ? [] : [{ label: 'RS Estadual (ref.)', data: anos.map(a => inse.serie_temporal[a]?.media), borderColor: '#B0BEC5', borderDash: [5, 5], tension: .3, pointRadius: 0, borderWidth: 2,
+            datalabels: { display: false }, hidden: (geoLabel === sectionSubtitle()) }])
         ]
       },
       options: {
@@ -9195,18 +9243,17 @@ function renderTdi() {
       </div>
     </div>
 
-    ${JV_MODE ? '' : `
     <!-- ═══ EIXO: Distribuição Territorial ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/territorial.png" alt=""></span>
-      <span class="section-divider-text">Distribuição Territorial — ${anoSel}</span>
+      <span class="section-divider-text">${JV_MODE ? 'Distribuição Territorial — TDI por Escola' : `Distribuição Territorial — ${anoSel}`}</span>
       <span class="section-divider-line"></span>
     </div>
 
     <div class="map-table-row d1">
       <div class="map-container">
         <div class="map-toolbar">
-          <h3>Mapa — TDI <span id="tdi-map-metrica-label">Fundamental</span> <span id="tdi-map-ano">${anoSel}</span></h3>
+          <h3>${JV_MODE ? 'Mapa de Escolas — TDI' : 'Mapa — TDI'} <span id="tdi-map-metrica-label">Fundamental</span> ${JV_MODE ? '' : `<span id="tdi-map-ano">${anoSel}</span>`}</h3>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <select id="tdi-map-metrica" class="map-select" style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-family:Inter">
               <option value="tdi_fund">Fundamental</option>
@@ -9214,27 +9261,27 @@ function renderTdi() {
               <option value="tdi_af">Anos Finais</option>
               ${JV_MODE ? '' : '<option value="tdi_med">Ensino Médio</option>'}
             </select>
-            <div class="map-layer-toggle">
+            ${JV_MODE ? '' : `<div class="map-layer-toggle">
               <button class="map-layer-btn active" id="tdi-btn-layer-mun">Municípios</button>
               <button class="map-layer-btn" id="tdi-btn-layer-cre">CREs</button>
               ${S.escolasData ? '<button class="map-layer-btn" id="tdi-btn-layer-escola">Escolas</button>' : ''}
-            </div>
+            </div>`}
           </div>
         </div>
         <div id="tdi-map-leaflet" style="height:380px;border-radius:8px"></div>
       </div>
       <div class="table-wrapper" id="tdi-table-wrapper">
         <div class="table-header">
-          <h3 id="tdi-table-title">Tabela de Municípios — TDI</h3>
+          <h3 id="tdi-table-title">${JV_MODE ? 'Tabela de Escolas — TDI' : 'Tabela de Municípios — TDI'}</h3>
           <input type="text" class="table-search" id="tdi-mun-search" placeholder="Buscar...">
         </div>
-        <div style="font-size:10px;color:var(--accent);padding:4px 12px 6px;font-weight:600;background:rgba(255,203,4,.08);border-radius:0 0 6px 6px;border-top:1px dashed rgba(255,203,4,.3)">
+        ${JV_MODE ? '' : `<div style="font-size:10px;color:var(--accent);padding:4px 12px 6px;font-weight:600;background:rgba(255,203,4,.08);border-radius:0 0 6px 6px;border-top:1px dashed rgba(255,203,4,.3)">
           📍 Clique em qualquer município — na tabela ou no mapa — para filtrar <strong>todas as visualizações</strong> desta seção.
-        </div>
+        </div>`}
         <div style="max-height:400px;overflow-y:auto" id="tdi-table-scroll">
           <table class="data-table" id="tdi-mun-table">
             <thead><tr>
-              <th style="cursor:pointer" data-sort-key="rank"># ↕</th><th style="cursor:pointer" data-sort-key="nome">Município ↕</th><th style="cursor:pointer" data-sort-key="n_escolas">Esc. ↕</th>
+              <th style="cursor:pointer" data-sort-key="rank"># ↕</th><th style="cursor:pointer" data-sort-key="nome">${JV_MODE ? 'Escola' : 'Município'} ↕</th>${JV_MODE ? '' : '<th style="cursor:pointer" data-sort-key="n_escolas">Esc. ↕</th>'}
               <th style="cursor:pointer" data-sort-key="tdi_fund">Fund. ↕</th><th style="cursor:pointer" data-sort-key="tdi_ai">AI ↕</th><th style="cursor:pointer" data-sort-key="tdi_af">AF ↕</th>${JV_MODE ? '' : '<th style="cursor:pointer" data-sort-key="tdi_med">Médio ↕</th>'}
             </tr></thead>
             <tbody></tbody>
@@ -9242,7 +9289,7 @@ function renderTdi() {
         </div>
         <div class="chart-source">${FONTE_TDI}</div>
       </div>
-    </div>`}
+    </div>
   `;
 
   // ── KPIs ──
@@ -9352,7 +9399,8 @@ function renderTdi() {
       f6: '#0277BD', f7: '#01579B', f8: '#0D47A1', f9: '#1A237E',
       m1: '#FF7043', m2: '#F4511E', m3: '#E64A19', m4: '#BF360C',
     };
-    const serieKeys = Object.keys(SERIE_LABELS);
+    // Joinville: rede municipal não tem Ensino Médio — remove séries m1-m4
+    const serieKeys = Object.keys(SERIE_LABELS).filter(k => !JV_MODE || !k.startsWith('m'));
     const serieData = serieKeys.map(k => porSerie[k] ?? null);
     const serieColors = serieKeys.map(k => SERIE_COLORS[k]);
     const hasData = serieData.some(v => v !== null);
@@ -9698,47 +9746,6 @@ function renderTdi() {
       return div;
     };
     S.mapLegend.addTo(S.map);
-
-    // Update table
-    const tableCont = document.getElementById('desig-table-container');
-    const tableBody = document.querySelector('#desig-table tbody');
-    if (isEsc && tableCont && tableBody) {
-      tableCont.style.display = 'block';
-      
-      const escRows = [];
-      const escolasLookup = yearData.escolas_lookup || S._universalEscolaLookup || {};
-      for (const [codEsc, escData] of Object.entries(yearData.por_escola || {})) {
-        const kData = escData?.geral?.[key];
-        if (kData?.media != null) {
-          const mRaca = escData?.dimensoes?.raca || {};
-          const mSexo = escData?.dimensoes?.sexo || {};
-          escRows.push({
-            nome: escolasLookup[codEsc]?.nome || codEsc,
-            media: kData.media,
-            branca: mRaca['Branca']?.[key]?.media,
-            preta: mRaca['Preta']?.[key]?.media,
-            parda: mRaca['Parda']?.[key]?.media,
-            fem: mSexo['Feminino']?.[key]?.media,
-            masc: mSexo['Masculino']?.[key]?.media
-          });
-        }
-      }
-      escRows.sort((a, b) => (b.media || 0) - (a.media || 0));
-
-      tableBody.innerHTML = escRows.map(d => `
-        <tr>
-          <td style="text-align:left;font-weight:500">${d.nome}</td>
-          <td style="text-align:right;font-weight:600;color:var(--pri)">${d.media != null ? d.media.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#003866">${d.branca != null ? d.branca.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#333">${d.preta != null ? d.preta.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#FFCB04">${d.parda != null ? d.parda.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#E91E63">${d.fem != null ? d.fem.toFixed(1) : '-'}</td>
-          <td style="text-align:right;color:#003866">${d.masc != null ? d.masc.toFixed(1) : '-'}</td>
-        </tr>
-      `).join('');
-    } else if (tableCont) {
-      tableCont.style.display = 'none';
-    }
   };
 
   // ── School table builder (reuses tdi-mun-table container) ──
@@ -9834,8 +9841,8 @@ function renderTdi() {
   };
 
   // Build everything
-  tdiBuildMap();
-  tdiBuildMunTable();
+  if (JV_MODE) { tdiBuildEscolaMap(); tdiBuildEscolaTable(); }
+  else { tdiBuildMap(); tdiBuildMunTable(); }
   injectExportButtons();
 
   // Bind map layer toggle (Municípios / CREs / Escolas)
@@ -9866,7 +9873,8 @@ function renderTdi() {
       const label = tdiMetricSel.options[tdiMetricSel.selectedIndex]?.text || 'Fundamental';
       const titleEl = document.getElementById('tdi-map-metrica-label');
       if (titleEl) titleEl.textContent = label;
-      if (tdiBtnEsc?.classList.contains('active')) { tdiBuildEscolaMap(); tdiBuildEscolaTable(); }
+      if (JV_MODE) { tdiBuildEscolaMap(); tdiBuildEscolaTable(); }
+      else if (tdiBtnEsc?.classList.contains('active')) { tdiBuildEscolaMap(); tdiBuildEscolaTable(); }
       else if (tdiBtnCre?.classList.contains('active')) { tdiBuildCreMap(); }
       else { tdiBuildMap(); }
     });
