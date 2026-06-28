@@ -20,7 +20,7 @@ Arquitetura: GitHub Pages + JSON (Python ETL) + HTML/JS/CSS + Chart.js 4 + Leafl
 
 ## Deploy
 - **GitHub Pages:** repo `Matheus-Bianco/painel-indicadores-joinville` (branch `main`, via GitHub Actions `.github/workflows/deploy.yml`, publica a pasta `painel/`).
-- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=21`, `app.js?v=61`.
+- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=24`, `app.js?v=67`. **Sempre incrementar ao alterar CSS/JS** (senão o GitHub Pages serve cache antigo).
 - Histórico de `.git` reescrito uma vez (orphan commit) para remover JSON de 99 MB (`4_11_desigualdades.json`).
 
 ## Estrutura do projeto
@@ -32,10 +32,10 @@ etl_*.py          → Scripts ETL que geram os JSONs
 
 ## Seções do painel
 1. **Acesso e Matrículas** — V1 ✅ (territorial por escola)
-2. **Infraestrutura** — V1 ✅ (territorial por escola: `buildInfraEscolaLayer`, cor=`infra_score`)
+2. **Infraestrutura** — V2 ✅ (territorial por escola: `buildInfraEscolaLayer`, cor=`infra_score`; série 2010-2025 inclui 2025 via `Tabela_Escola_2025.csv`; climatização: `capClimatizacaoJV` dinâmico oculta só anos subnotificados — ver "Armadilha climatização")
 3. **Docência** — V1 ✅ (territorial por escola: `buildDocEscolaLayer`)
 4. **Formação Docente (AFD)** — V1 ✅ (territorial por escola: `afdBuildEscMap`, usa `por_escola_2025`)
-5. **Fluxo e Rendimento** — V1 ✅ (territorial por escola: `fluxoBuildEscMap`, usa `por_escola_2024` — FIXO em 2024)
+5. **Fluxo e Rendimento** — V2 ✅ (base consolidada INEP por município 2010-2025; territorial por escola: `fluxoBuildEscMap` usa `por_escola_recente`=2025; seção "Rendimento por Série" 1º-9º ano reage ao filtro de Ano; módulo de comparação Joinville × municípios SC × média municipal)
 6. **Distorção Idade-Série (TDI)** — V1 ✅ (territorial REMOVIDO — sem dado por escola)
 7. **Complexidade de Gestão (ICG)** — V1 ✅ (territorial por escola: `icgBuildEscolaLayer`, cor=`icg_nivel`)
 8. **Contexto Socioeconômico (INSE)** — V1 ✅ (territorial REMOVIDO — sem dado por escola)
@@ -45,7 +45,8 @@ etl_*.py          → Scripts ETL que geram os JSONs
 ## Distribuição Territorial (regra Joinville)
 - **Tem dado por escola → mapa de pontos + tabela por escola** (sem camadas Município/CRE): Acesso, Infra, Docência, AFD, ICG, Fluxo.
 - **Sem dado por escola → bloco territorial REMOVIDO** em `JV_MODE`: IDEB, SAEB, TDI, INSE.
-- Dados por escola: `painel/dados/escolas_municipais.json` (162 escolas, infra/matrículas/docentes/`icg_nivel`/`afd_ed_inf`); `4_3_fluxo_municipal.json` → `por_escola_2024` (86); `4_9_afd_municipal.json` → `por_escola_2025` (162).
+- Dados por escola: `painel/dados/escolas_municipais.json` (162 escolas, infra/matrículas/docentes/`icg_nivel`/`afd_ed_inf`); `4_3_fluxo_municipal.json` → `por_escola_recente` (85, ano em `ano_escola_recente`=2025, com taxas por série `aprov/reprov/aband_fund_01..09`); `4_9_afd_municipal.json` → `por_escola_2025` (162).
+- **Boletim por escola** (`abrirBoletim`): além dos gráficos históricos, exibe "Rendimento por Série" da escola (canvas `boletim-chart-serie`, alimentado por `por_escola_recente`, match `cod_escola === inep`), reusando `fluxoBuildSerieChart(rec, {canvasId, pillsId})`.
 
 ## Arquitetura JS
 - Estado central: objeto `S` (S.data, S.geo, S.fluxo, S.saeb, S.infra, S.doc)
@@ -66,8 +67,8 @@ etl_*.py          → Scripts ETL que geram os JSONs
 | Script | JSON gerado | Fonte |
 |--------|-------------|-------|
 | `etl_censo_escolar.py` | `4_1_acesso_matriculas.json` | Microdados Censo |
-| `etl_infra_docentes.py` | `4_5_infraestrutura.json` + `4_5_docentes.json` | Censo |
-| `etl_fluxo_rendimento.py` | `4_3_fluxo_rendimento.json` | INEP Rendimento + TDI |
+| `etl_infra_docentes.py` | `4_5_infra_municipal.json` (+ compat `4_5_infraestrutura.json`) + `4_5_docentes.json` | Censo (2010-2024 microdados + `Tabela_Escola_2025.csv`) |
+| `etl_fluxo_rendimento.py` | `4_3_fluxo_municipal.json` (+ compat `4_3_fluxo_rendimento.json`) | INEP bases consolidadas por município (Rendimento+TDI 2010-2025); gera `serie_temporal` (Joinville), `por_municipio` (295 SC), `serie_municipios_sc` (média SC) e `por_escola_recente` |
 | `etl_saeb.py` | `4_6_saeb.json` | SAEB |
 | `etl_funil_turma_locdif.py` | `4_1_funil_turma_locdif.json` | Censo |
 
@@ -117,8 +118,26 @@ etl_*.py          → Scripts ETL que geram os JSONs
 
 ---
 
-## Histórico de evolução (15/jun/2026)
+## Armadilhas conhecidas (Joinville)
+1. **Climatização (Censo):** a rede municipal **deixou de preencher** `QT_SALAS_UTILIZA_CLIMATIZADAS` em **2023 (3,1%) e 2024 (0,7%)**, mas **voltou a preencher em 2025 (99,8%)**. Valores reais: 2021=96,7% · 2022=96,5% · **2023/2024 subnotificados** · 2025=99,8%.
+   - `capClimatizacaoJV(infra)` em `app.js` oculta **dinamicamente** só os anos com cobertura `< 20%` (`CLIMA_COBERTURA_MIN`) — preserva 2022 e 2025. **NÃO** voltar ao corte fixo `> 2022` (apagaria o 2025 bom).
+   - Título da aba "Climatização & Outros" usava `comboNames` errado → corrigido (antes mostrava "Saneamento & Alimentação").
+2. **Fluxo/Rendimento ≠ média de escolas:** usar as **bases consolidadas por município do INEP** (não média das escolas). Taxas por série só existem **de 2012 em diante**.
+3. **`por_escola_recente`** é uma **lista** (não dict); match por `cod_escola === inep`. Nem toda escola (162) tem rendimento (85) — tratar estado vazio.
+
+## Histórico de evolução
+### 28/jun/2026 — Sincronização com painel UNESCO (`commit 3a0570d`)
+- **Fluxo:** ETL reescrito para base consolidada INEP (2010-2025), `por_municipio` dos 295 municípios de SC + `serie_municipios_sc` (média). Nova seção **"Rendimento por Série"** (1º-9º ano) que reage ao filtro de Ano (corrige bug do filtro "sem efeito"); `S.anoSel` agora é sincronizado em `renderFluxo`.
+- **Comparação municipal:** novo módulo (só `JV_MODE`) com lista suspensa dos 295 municípios + linha "Média municípios de SC" (`fluxoBuildComparacao`, `FLX_COMP_METRICS`, `.flx-comp-select`).
+- **Infraestrutura:** ETL passa a ler 2025 (`Tabela_Escola_2025.csv`); climatização restaurada (cap dinâmico); `infraLatestMunYear()` substitui hardcode 2024.
+- **Visão por Escola:** boletim ganha gráfico "Rendimento por Série" da escola (`fluxoBuildSerieChart` parametrizado por `canvasId`/`pillsId`).
+
+### 15/jun/2026
 - Setup GitHub Pages + limpeza do histórico git (removido JSON de 99 MB).
 - Aplicada identidade visual Joinville (azul `#003866` + branco) e logo (`commit 1bdca1c`).
 - Header reduzido a filtro de Ano; Distribuição Territorial por escola (Infra/Docência/AFD/ICG/Fluxo) e removida onde não há dado por escola (IDEB/SAEB/TDI/INSE) (`commit ea19bab`).
-- **Próximos passos sugeridos:** (a) avaliar aviso visual no Fluxo (territorial fixo em 2024); (b) definir avaliação local (Diagnóstica Bússola) para a aba oculta; (c) substituir bases RS remanescentes em `00. Bases de Dados/`.
+
+## Próximos passos sugeridos
+- Definir avaliação local (Diagnóstica Bússola) para a aba oculta (SAERS).
+- Seção Desigualdade (raça/cor, sexo) — evolução futura.
+- Substituir bases RS remanescentes em `00. Bases de Dados/` por extrações de Joinville.
