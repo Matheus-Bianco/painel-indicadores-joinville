@@ -213,6 +213,23 @@ def etl_infraestrutura():
         elapsed = time.time() - t0
         print(f"{len(df)} escolas ({elapsed:.1f}s)")
 
+    # 2025 vem na estrutura nova (Tabela_Escola_2025), com as mesmas colunas IN_* / QT_SALAS_*
+    f_esc_2025 = os.path.join(MICRO_DIR, "Tabela_Escola_2025.csv")
+    if os.path.exists(f_esc_2025):
+        print("    2025 (Tabela_Escola)...", end=" ", flush=True)
+        t0 = time.time()
+        header = pd.read_csv(f_esc_2025, sep=";", encoding="latin-1", nrows=0)
+        avail = [c for c in list(INFRA_INDICATORS.keys()) if c in header.columns and c != "IN_CLIMATIZACAO"]
+        salas_avail = [c for c in COLS_SALAS if c in header.columns]
+        use_id = [c for c in id_cols if c in header.columns]
+        use = use_id + avail + salas_avail
+        df = pd.read_csv(f_esc_2025, sep=";", encoding="latin-1", usecols=use)
+        df = df[(df["CO_MUNICIPIO"] == CO_MUN_JOINVILLE) & (df["TP_SITUACAO_FUNCIONAMENTO"] == 1)]
+        if 'TP_CATEGORIA_ESCOLA_PRIVADA' in df.columns:
+            df['TP_CATEGORIA_ESCOLA_PRIVADA'] = df['TP_CATEGORIA_ESCOLA_PRIVADA'].fillna(0).astype(int)
+        dfs_por_ano["2025"] = (df, avail)
+        print(f"{len(df)} escolas ({time.time()-t0:.1f}s)")
+
     anos_sorted = sorted(dfs_por_ano.keys())
 
     # [2/2] Gerar JSON para cada rede

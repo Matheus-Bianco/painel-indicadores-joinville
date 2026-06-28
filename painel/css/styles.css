@@ -575,6 +575,40 @@ body.sidebar-hidden .sidebar {
   color: #fff;
 }
 
+/* Selects da comparação municipal em Fluxo e Rendimento */
+.flx-comp-select {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pri, #003866);
+  background: #fff;
+  border: 1.5px solid rgba(0,56,102,.22);
+  border-radius: 7px;
+  padding: 5px 9px;
+  max-width: 260px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.flx-comp-select:hover { border-color: var(--accent, #FFCB04); }
+.flx-comp-select:focus { outline: none; border-color: var(--accent, #FFCB04); box-shadow: 0 0 0 3px rgba(255,203,4,.18); }
+
+/* Ícone de informação inline (tooltip nativo via title) */
+.info-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pri, #003866);
+  background: rgba(0,56,102,.1);
+  border-radius: 50%;
+  cursor: help;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 /* ── Searchable Municipality Dropdown ── */
 .searchable-select {
   position: relative;

@@ -2132,29 +2132,45 @@ const INFRA_CAT_COLORS = {
   'Climatizacao': '#00838F',
 };
 
-// Climatização: a rede deixou de preencher QT_SALAS_UTILIZA_CLIMATIZADAS no
-// Censo a partir de 2023 (cai de ~96% em 2022 para ~3% em 2023 e <1% em 2024).
-// Em Joinville, removemos os anos não confiáveis para não exibir dado incorreto.
-const CLIMA_ULTIMO_ANO_CONFIAVEL = '2022';
+// Climatização: a rede municipal de Joinville deixou de preencher
+// QT_SALAS_UTILIZA_CLIMATIZADAS no Censo em 2023 e 2024 (caiu de ~96% em 2022
+// para ~3% em 2023 e <1% em 2024), mas voltou a preencher em 2025 (~100%).
+// Em vez de cortar por um ano fixo, detectamos dinamicamente os anos com
+// subnotificação evidente (cobertura < 20%) e ocultamos APENAS esses anos —
+// preservando 2022 e 2025+, que são confiáveis.
+const CLIMA_COBERTURA_MIN = 20;   // % mínimo plausível de escolas climatizadas
 const CLIMA_COLS = ['IN_CLIMATIZACAO', 'PCT_SALAS_CLIMATIZADAS'];
 
 function capClimatizacaoJV(infra) {
   if (!JV_MODE || !infra || infra._climaCapped) return;
+  // Anos não confiáveis = têm dado de climatização, porém com cobertura implausível
+  const anosRuins = new Set();
+  for (const [ano, no] of Object.entries(infra.serie_temporal || {})) {
+    const pct = no?.indicadores?.IN_CLIMATIZACAO?.pct;
+    if (pct != null && pct < CLIMA_COBERTURA_MIN) anosRuins.add(ano);
+  }
   const limparNo = (no) => {
     if (no?.indicadores) for (const c of CLIMA_COLS) delete no.indicadores[c];
   };
   for (const [ano, no] of Object.entries(infra.serie_temporal || {})) {
-    if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) limparNo(no);
+    if (anosRuins.has(ano)) limparNo(no);
   }
   for (const [ano, muns] of Object.entries(infra.por_municipio || {})) {
-    if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) for (const m of Object.values(muns)) limparNo(m);
+    if (anosRuins.has(ano)) for (const m of Object.values(muns)) limparNo(m);
   }
   for (const grupo of [infra.por_localizacao, infra.por_dependencia]) {
     for (const [ano, sub] of Object.entries(grupo || {})) {
-      if (ano > CLIMA_ULTIMO_ANO_CONFIAVEL) for (const v of Object.values(sub)) limparNo(v);
+      if (anosRuins.has(ano)) for (const v of Object.values(sub)) limparNo(v);
     }
   }
+  infra._climaCappedAnos = Array.from(anosRuins);
   infra._climaCapped = true;
+}
+
+/** Último ano disponível em infra.por_municipio (antes hardcoded em 2024). */
+function infraLatestMunYear(infra) {
+  const keys = Object.keys(infra?.por_municipio || {});
+  return keys.length ? keys.sort().pop() : null;
 }
 
 function renderInfra() {
@@ -2592,7 +2608,8 @@ function buildInfraKPIs(infra, ano, anos) {
     return su.indicadores[key]?.pct ?? null;
   };
 
-  // Ar Condicionado: fonte só é confiável até 2022 — usa o último ano com dado válido
+  // Ar Condicionado: a rede não preencheu o Censo em 2023/2024 (ocultados);
+  // usa o último ano com dado válido (2025 voltou a ~100%).
   let climaKpi = { label: 'Ar Condicionado', prevVal: suPrev?.indicadores?.IN_CLIMATIZACAO?.pct, val: getVal('IN_CLIMATIZACAO') };
   if (JV_MODE) {
     const anosClima = anos.filter(a => infra.serie_temporal[a]?.indicadores?.IN_CLIMATIZACAO?.pct != null);
@@ -2677,11 +2694,12 @@ function buildInfraChart(infra, anoComp, catKey, anoBase) {
 
   // Municipality/CRE override
   let munSu = null;
-  if (S.munSel && infra.por_municipio?.['2024']?.[S.munSel]) {
-    munSu = infra.por_municipio['2024'][S.munSel];
+  const _munYr = infraLatestMunYear(infra) || '2024';
+  if (S.munSel && infra.por_municipio?.[_munYr]?.[S.munSel]) {
+    munSu = infra.por_municipio[_munYr][S.munSel];
   } else if (S.creSel) {
     const creMuns = getCreMuns(S.creSel);
-    const pm = infra.por_municipio?.['2024'] || {};
+    const pm = infra.por_municipio?.[_munYr] || {};
     munSu = { escolas: 0, indicadores: {} };
     for (const cod of creMuns) {
       const m = pm[cod]; if (!m) continue;
@@ -2704,10 +2722,17 @@ function buildInfraChart(infra, anoComp, catKey, anoBase) {
 
   // Parse category keys (can be comma-separated)
   const catKeys = catKey.split(',');
-  const catNames = { 'Tecnologia': 'Tecnologia', 'Espacos Pedagogicos': 'Espaços Pedagógicos', 'Acessibilidade': 'Acessibilidade', 'Saneamento e Energia': 'Saneamento & Alimentação', 'Alimentacao': 'Alimentação', 'Climatizacao': 'Climatização (Ar Condicionado)' };
-  const catLabel = catKeys.length > 1 ? 'Saneamento & Alimentação' : (catNames[catKeys[0]] || catKeys[0]);
+  const catNames = { 'Tecnologia': 'Tecnologia', 'Espacos Pedagogicos': 'Espaços Pedagógicos', 'Estrutura Administrativa': 'Estrutura Administrativa', 'Acessibilidade': 'Acessibilidade', 'Saneamento e Energia': 'Saneamento & Alimentação', 'Alimentacao': 'Alimentação', 'Sustentabilidade': 'Sustentabilidade', 'Climatizacao': 'Climatização', 'Espacos Adicionais': 'Espaços Adicionais' };
+  const comboNames = { 'Saneamento e Energia,Alimentacao': 'Saneamento & Alimentação', 'Climatizacao,Espacos Adicionais': 'Climatização & Outros' };
+  const catLabel = comboNames[catKey] || (catKeys.length > 1 ? catKeys.map(c => catNames[c] || c).join(' & ') : (catNames[catKeys[0]] || catKeys[0]));
+  const munYear = infraLatestMunYear(infra) || '2024';
   const titleEl = document.getElementById('infra-chart-title');
-  if (titleEl) titleEl.textContent = `${catLabel} — ${munSu ? '2024' : baseYear + ' vs ' + anoComp}${geoSuffix()}`;
+  if (titleEl) {
+    titleEl.textContent = `${catLabel} — ${munSu ? munYear : baseYear + ' vs ' + anoComp}${geoSuffix()}`;
+    if (catKeys.includes('Climatizacao')) {
+      titleEl.innerHTML = `${titleEl.textContent} <span class="info-tooltip" title="Climatização: percentual de escolas com ao menos uma sala climatizada (ar-condicionado/climatizadores), conforme o Censo Escolar (QT_SALAS_UTILIZA_CLIMATIZADAS). Em Joinville, a rede não preencheu este campo em 2023 e 2024 — esses anos são ocultados; 2022 e 2025 são confiáveis.">ⓘ</span>`;
+    }
+  }
 
   const allCols = [];
   catKeys.forEach(cat => { if (cats[cat]) allCols.push(...cats[cat]); });
@@ -5588,6 +5613,7 @@ function renderFluxo() {
   }
   const anos = Object.keys(f.serie_temporal).sort();
   const anoSel = anos.includes(S.anoSel) ? S.anoSel : anos[anos.length - 1];
+  S.anoSel = anoSel; // sincroniza estado para o chip de filtro e leituras subsequentes
   const lookup = f.lookup_municipios || {};
   const main = document.getElementById('main-content');
   destroyCharts(); destroyMap();
@@ -5661,6 +5687,44 @@ function renderFluxo() {
       </div>
     </div>
 
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Rendimento por Série</span>
+      <span class="section-divider-line"></span>
+    </div>
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div class="chart-card d2">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+          <div class="chart-title" style="margin:0">Taxa por Série — <span id="flx-serie-ano">${anoSel}</span> (%)${geoSuffix()}</div>
+          <div class="flx-toggle-pills" id="flx-serie-pills">
+            <button class="flx-pill active" data-rate="aprov" style="--pill-color:#2E9B6B">Aprovação</button>
+            <button class="flx-pill" data-rate="reprov" style="--pill-color:#F57C00">Reprovação</button>
+            <button class="flx-pill" data-rate="aband" style="--pill-color:${COLORS.red}">Abandono</button>
+          </div>
+        </div>
+        <div style="height:320px"><canvas id="flx-chart-serie"></canvas></div>
+        <div class="chart-source">${FONTE_REND} · Recorte por série disponível de 2012 em diante, via arquivos oficiais por município do INEP.</div>
+      </div>
+    </div>
+    ${JV_MODE ? `
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Comparação com Municípios de SC</span>
+      <span class="section-divider-line"></span>
+    </div>
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div class="chart-card d2">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+          <div class="chart-title" style="margin:0">Joinville vs. Municípios de SC — Evolução (%)</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="flx-comp-metric" class="flx-comp-select">${FLX_COMP_METRICS.map((m, i) => `<option value="${m.key}" ${i === 0 ? 'selected' : ''}>${m.label}</option>`).join('')}</select>
+            <select id="flx-comp-mun" class="flx-comp-select"><option value="">Comparar com município… (opcional)</option></select>
+          </div>
+        </div>
+        <div style="height:340px"><canvas id="flx-chart-comp"></canvas></div>
+        <div class="chart-source">${FONTE_REND} · "Média dos municípios de SC" = média simples entre os municípios catarinenses com dado no ano.</div>
+      </div>
+    </div>` : ''}
 
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/territorial.png" alt=""></span>
@@ -5670,7 +5734,7 @@ function renderFluxo() {
     <div class="map-table-row d1">
       <div class="map-container">
         <div class="map-toolbar">
-          <h3>${JV_MODE ? 'Mapa de Escolas — 2024' : `Mapa — ${anoSel}`}</h3>
+          <h3>${JV_MODE ? `Mapa de Escolas — ${f.ano_escola_recente || '2025'}` : `Mapa — ${anoSel}`}</h3>
           <select id="flx-map-metric">
             ${FLUXO_MAP_METRICS.filter(m => !JV_MODE || !m.key.endsWith('_med')).map(m => `<option value="${m.key}">${m.label}</option>`).join('')}
           </select>
@@ -5722,7 +5786,7 @@ function renderFluxo() {
       </div>
       <div class="table-wrapper" id="flx-escola-wrapper" style="display:none">
         <div class="table-header">
-          <h3>Tabela de Escolas (2024)</h3>
+          <h3>Tabela de Escolas (${f.ano_escola_recente || '2025'})</h3>
           <input type="text" class="table-search" id="flx-escola-search" placeholder="Buscar escola...">
         </div>
         <div style="max-height:400px;overflow-y:auto">
@@ -5744,6 +5808,10 @@ function renderFluxo() {
   fluxoUpdateKPIs(st, tdiSrc, f, anos, anoSel);
   // Build Charts — need to build per-year data source for time-series
   fluxoBuildCharts(f, anos, anoSel, st, tdiSrc);
+  // Build Série chart (rendimento por série, ano selecionado + recorte atual)
+  fluxoBuildSerieChart(st);
+  // Comparação com municípios de SC (apenas Joinville)
+  if (JV_MODE) fluxoBuildComparacao(f, anos);
   // Build Map + Table
   if (JV_MODE) {
     // Joinville: recorte municipal único — apenas mapa de pontos + tabela por escola (dados 2024)
@@ -6094,6 +6162,218 @@ function fluxoBuildCharts(f, anos, anoSel, st, tdiSrc) {
 
   // 4. (Taxas por Etapa removed)
   // 5. (TDI removed — now has its own section)
+}
+
+// ── Rendimento por Série (1º–9º ano e EM) ──
+const FLX_SERIE_DEFS = [
+  { suf: 'fund_01', label: '1º Ano' }, { suf: 'fund_02', label: '2º Ano' },
+  { suf: 'fund_03', label: '3º Ano' }, { suf: 'fund_04', label: '4º Ano' },
+  { suf: 'fund_05', label: '5º Ano' }, { suf: 'fund_06', label: '6º Ano' },
+  { suf: 'fund_07', label: '7º Ano' }, { suf: 'fund_08', label: '8º Ano' },
+  { suf: 'fund_09', label: '9º Ano' },
+  { suf: 'med_01', label: '1ª Série EM' }, { suf: 'med_02', label: '2ª Série EM' },
+  { suf: 'med_03', label: '3ª Série EM' }, { suf: 'med_04', label: '4ª Série EM' },
+];
+
+const FLX_SERIE_RATE_CFG = {
+  aprov:  { color: '#2E9B6B', label: 'Aprovação' },
+  reprov: { color: '#F57C00', label: 'Reprovação' },
+  aband:  { color: COLORS.red, label: 'Abandono' },
+};
+
+// Métricas da comparação entre Joinville e demais municípios de SC (rede municipal)
+const FLX_COMP_METRICS = [
+  { key: 'aprov_fund_ai', label: 'Aprovação — Anos Iniciais', higher: true },
+  { key: 'aprov_fund_af', label: 'Aprovação — Anos Finais', higher: true },
+  { key: 'aprov_fund',    label: 'Aprovação — Fundamental', higher: true },
+  { key: 'reprov_fund_ai',label: 'Reprovação — Anos Iniciais', higher: false },
+  { key: 'reprov_fund_af',label: 'Reprovação — Anos Finais', higher: false },
+  { key: 'aband_fund_ai', label: 'Abandono — Anos Iniciais', higher: false },
+  { key: 'aband_fund_af', label: 'Abandono — Anos Finais', higher: false },
+];
+
+/** Título-caso simples para nomes de município vindos em CAIXA ALTA do INEP. */
+function tituloMunicipio(nome) {
+  if (!nome) return '';
+  const minus = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  return String(nome).toLowerCase().split(/\s+/).map((w, i) =>
+    (i > 0 && minus.has(w)) ? w : (w.charAt(0).toUpperCase() + w.slice(1))
+  ).join(' ');
+}
+
+/** Comparação Joinville vs média dos municípios de SC vs município selecionado. */
+function fluxoBuildComparacao(f, anos) {
+  const el = document.getElementById('flx-chart-comp');
+  if (!el) return;
+  const codJV = f.metadata?.cod_municipio || '4209102';
+  const lookup = f.lookup_municipios || {};
+
+  // Popula dropdown de municípios (todos de SC, exceto Joinville), ordenado por nome
+  const munSel = document.getElementById('flx-comp-mun');
+  if (munSel && munSel.options.length <= 1) {
+    const opts = Object.keys(lookup)
+      .filter(c => c !== codJV)
+      .map(c => ({ cod: c, nome: tituloMunicipio(lookup[c]) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+    munSel.insertAdjacentHTML('beforeend', opts.map(o => `<option value="${o.cod}">${o.nome}</option>`).join(''));
+  }
+
+  let compChart = null;
+  const valAno = (src, ano, key) => (src?.[ano]?.[key] ?? null);
+
+  const build = () => {
+    const metricKey = document.getElementById('flx-comp-metric')?.value || FLX_COMP_METRICS[0].key;
+    const munCod = document.getElementById('flx-comp-mun')?.value || '';
+    const metric = FLX_COMP_METRICS.find(m => m.key === metricKey) || FLX_COMP_METRICS[0];
+
+    const dsJV = anos.map(a => valAno(f.serie_temporal, a, metricKey));
+    const dsSC = anos.map(a => valAno(f.serie_municipios_sc, a, metricKey));
+    const datasets = [
+      { label: 'Joinville', data: dsJV, borderColor: COLORS.pri, backgroundColor: COLORS.pri + '18', borderWidth: 3, tension: .35, pointRadius: 4, fill: false },
+      { label: 'Média municípios de SC', data: dsSC, borderColor: '#8895a7', borderDash: [6, 4], borderWidth: 2, tension: .35, pointRadius: 3, fill: false },
+    ];
+    if (munCod) {
+      const dsMun = anos.map(a => (f.por_municipio?.[a]?.[munCod]?.[metricKey] ?? null));
+      datasets.push({ label: tituloMunicipio(lookup[munCod]) || munCod, data: dsMun, borderColor: COLORS.accent || '#D4A84B', borderWidth: 2.5, tension: .35, pointRadius: 4, fill: false });
+    }
+
+    if (compChart) { compChart.data.datasets = datasets; compChart.update(); return; }
+
+    compChart = new Chart(el, {
+      type: 'line',
+      data: { labels: anos, datasets },
+      options: {
+        ...CHART_DEFAULTS,
+        layout: { padding: { top: 24 } },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, labels: { font: { family: 'Inter', size: 11, weight: '600' }, boxWidth: 12, padding: 10, usePointStyle: true } },
+          datalabels: { display: false },
+          tooltip: {
+            enabled: true, mode: 'index', intersect: false,
+            backgroundColor: 'rgba(30,30,30,.92)', titleFont: { family: 'Inter', size: 12, weight: '700' },
+            bodyFont: { family: 'Inter', size: 11 }, padding: 10, cornerRadius: 8,
+            callbacks: {
+              title: items => items[0]?.label || '',
+              label: item => item.raw != null ? `  ${item.dataset.label}: ${item.raw.toFixed(1)}%` : `  ${item.dataset.label}: sem dado`,
+            },
+          },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { ...CHART_DEFAULTS.scales.y, min: metric.higher ? 80 : 0, suggestedMax: metric.higher ? 100 : 10, grace: '8%' },
+        },
+      },
+    });
+    S.charts.push(compChart);
+  };
+
+  build();
+  document.getElementById('flx-comp-metric')?.addEventListener('change', build);
+  document.getElementById('flx-comp-mun')?.addEventListener('change', build);
+}
+
+/** Barras de taxa (aprov/reprov/aband) por série, para o ano + recorte geográfico atuais.
+ *  opts.canvasId / opts.pillsId permitem reuso (ex.: boletim por escola). */
+function fluxoBuildSerieChart(st, opts) {
+  opts = opts || {};
+  const canvasId = opts.canvasId || 'flx-chart-serie';
+  const pillsSel = '#' + (opts.pillsId || 'flx-serie-pills');
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  st = st || {};
+
+  // Joinville (rede municipal) não tem Ensino Médio — exibe apenas o Fundamental
+  const defs = JV_MODE ? FLX_SERIE_DEFS.filter(s => s.suf.startsWith('fund')) : FLX_SERIE_DEFS;
+  const labels = defs.map(s => s.label);
+  const isMed = defs.map(s => s.suf.startsWith('med'));
+
+  const buildData = (rate) => defs.map(s => st[`${rate}_${s.suf}`] ?? null);
+
+  const temSerie = ['aprov', 'reprov', 'aband'].some(r => buildData(r).some(v => v != null));
+  if (!temSerie) {
+    const host = el.parentElement;
+    if (host) {
+      host.innerHTML = `
+        <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--text-sec);gap:6px;padding:20px">
+          <img src="img/icons/panorama.png" alt="" style="width:34px;height:34px;opacity:.35">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">Recorte por série indisponível para este ano</div>
+          <div style="font-size:11.5px;max-width:420px;line-height:1.5">As taxas por série (1º–9º ano) estão disponíveis de <strong>2012 em diante</strong>, conforme os arquivos oficiais por município do INEP. Selecione 2012 ou um ano posterior para visualizar.</div>
+        </div>`;
+    }
+    return;
+  }
+
+  const colorFor = (rate) => {
+    const base = FLX_SERIE_RATE_CFG[rate].color;
+    return defs.map((s, i) => isMed[i] ? base : base + 'B3');
+  };
+
+  const initialRate = 'aprov';
+  const data0 = buildData(initialRate);
+
+  const serieChart = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: FLX_SERIE_RATE_CFG[initialRate].label,
+        data: data0,
+        backgroundColor: colorFor(initialRate),
+        borderRadius: 4,
+        maxBarThickness: 46,
+      }],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      layout: { padding: { top: 26 } },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { display: false },
+        datalabels: {
+          ...DL_BAR_PCT,
+          anchor: 'end', align: 'end',
+          display: ctx => ctx.dataset.data[ctx.dataIndex] != null,
+          formatter: v => (v == null ? '' : v.toFixed(1) + '%'),
+        },
+        tooltip: {
+          enabled: true, mode: 'index', intersect: false,
+          backgroundColor: 'rgba(30,30,30,.92)', titleFont: { family: 'Inter', size: 12, weight: '700' },
+          bodyFont: { family: 'Inter', size: 11 }, padding: 10, cornerRadius: 8,
+          callbacks: {
+            title: items => items[0]?.label || '',
+            label: item => item.raw != null ? `  ${item.dataset.label}: ${item.raw.toFixed(1)}%` : '  Sem dado',
+          },
+        },
+      },
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        x: { ...CHART_DEFAULTS.scales.x, grid: { display: false } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, suggestedMax: 100, grace: '12%' },
+      },
+    },
+  });
+  S.charts.push(serieChart);
+
+  const applyRate = (rate) => {
+    const cfg = FLX_SERIE_RATE_CFG[rate];
+    const ds = serieChart.data.datasets[0];
+    ds.label = cfg.label;
+    ds.data = buildData(rate);
+    ds.backgroundColor = colorFor(rate);
+    serieChart.options.scales.y.suggestedMax = rate === 'aprov' ? 100 : Math.max(15, Math.ceil(Math.max(0, ...ds.data.filter(v => v != null)) * 1.2));
+    serieChart.options.scales.y.min = rate === 'aprov' ? 50 : 0;
+    serieChart.update();
+  };
+  applyRate(initialRate);
+
+  document.querySelectorAll(pillsSel + ' .flx-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll(pillsSel + ' .flx-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      applyRate(pill.dataset.rate);
+    });
+  });
 }
 
 /** Leaflet choropleth for Fluxo rates */
@@ -6467,7 +6747,8 @@ function fluxoBuildEscMap(f, anoSel, metricKey) {
   if (!mapEl || !S.geo || !S.escolasData?.escolas) return;
   destroyMap();
 
-  const escData = f.por_escola_2024 || [];
+  const escData = f.por_escola_recente || f.por_escola_2024 || [];
+  const anoEsc = f.ano_escola_recente || '2024';
   const metricDef = FLUXO_MAP_METRICS.find(m => m.key === metricKey) || FLUXO_MAP_METRICS[0];
 
   // Build coords lookup from escolas_estaduais.json (inep field = cod_escola)
@@ -6541,7 +6822,7 @@ function fluxoBuildEscMap(f, anoSel, metricKey) {
   const legend = L.control({ position: 'bottomleft' });
   legend.onAdd = function () {
     const div = L.DomUtil.create('div', 'map-legend');
-    div.innerHTML = `<h4>${metricDef.label} (Escolas 2024)</h4>` +
+    div.innerHTML = `<h4>${metricDef.label} (Escolas ${anoEsc})</h4>` +
       tiers.slice().reverse().map(t => `<div class="map-legend-row"><div class="map-legend-swatch" style="background:${t.color}"></div><span>${t.label}</span></div>`).join('');
     div.innerHTML += `<div class="map-legend-row" style="margin-top:4px"><div class="map-legend-swatch" style="background:#f0f0f0"></div><span>Sem dados</span></div>`;
     return div;
@@ -12515,6 +12796,26 @@ function renderEscolas() {
       </div>
     `;
 
+    // SEÇÃO RENDIMENTO POR SÉRIE (Full width inside Boletim)
+    const _anoSerieEsc = (S.fluxo && (S.fluxo.ano_escola_recente)) || '2025';
+    cHtml += `
+      <div style="background:#fafbfc;border:1px solid #e0e0e0;border-radius:12px;padding:24px;margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+          <div style="font-size:16px;font-weight:800;color:#0D47A1;display:flex;align-items:center;gap:8px">
+            <img src="img/icons/panorama.png" style="width:24px;height:24px;filter:opacity(0.9)">
+            Rendimento por Série — ${_anoSerieEsc}
+          </div>
+          <div class="flx-toggle-pills" id="boletim-serie-pills">
+            <button class="flx-pill active" data-rate="aprov" style="--pill-color:#2E9B6B">Aprovação</button>
+            <button class="flx-pill" data-rate="reprov" style="--pill-color:#F57C00">Reprovação</button>
+            <button class="flx-pill" data-rate="aband" style="--pill-color:${COLORS.red}">Abandono</button>
+          </div>
+        </div>
+        <div style="height:320px"><canvas id="boletim-chart-serie"></canvas></div>
+        <div class="chart-source">${FONTE_REND} · Taxas por série (1º–9º ano) do INEP por escola.</div>
+      </div>
+    `;
+
     // SEÇÃO SAERS (Full width inside Boletim) — oculta na rede municipal de Joinville
     cHtml += JV_MODE ? '' : `
       <div style="background:#fafbfc;border:1px solid #e0e0e0;border-radius:12px;padding:24px">
@@ -12547,6 +12848,10 @@ function renderEscolas() {
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     window.renderBoletimFluxo(e.inep);
+    // Rendimento por série da escola (dados recentes do INEP por escola)
+    const _recSerieEsc = (S.fluxo?.por_escola_recente || S.fluxo?.por_escola_2025 || [])
+      .find(x => String(x.cod_escola) === String(e.inep));
+    fluxoBuildSerieChart(_recSerieEsc || {}, { canvasId: 'boletim-chart-serie', pillsId: 'boletim-serie-pills' });
     if (!JV_MODE) window.renderBoletimSaers(e.inep);
   };
   // Update function
