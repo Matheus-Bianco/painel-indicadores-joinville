@@ -5532,7 +5532,7 @@ function renderHome() {
       </header>
       <div class="home-content">
 
-        <div class="home-divider" style="margin:8px 0 16px">
+        <div class="home-divider">
           <span class="home-divider-line"></span>
           <span class="home-divider-text">Explorar Seções</span>
           <span class="home-divider-line"></span>
@@ -5551,7 +5551,7 @@ function renderHome() {
           `).join('')}
         </div>
 
-        <div class="home-divider" style="margin:28px 0 16px">
+        <div class="home-divider">
           <span class="home-divider-line"></span>
           <span class="home-divider-text">Documentos e Recursos</span>
           <span class="home-divider-line"></span>
@@ -5584,13 +5584,13 @@ function renderHome() {
           </a>
         </div>
 
-        <div class="home-footer" style="margin-top:32px">
+        <div class="home-footer">
           <div class="home-footer-text">
             Secretaria de Educação de Joinville<br>
             Painel de Dados Abertos da Educação — Rede Municipal
           </div>
           <div class="home-footer-logos">
-            <img src="img/logo_joinville.png" alt="Joinville" style="height:56px" onerror="this.style.display='none'">
+            <img src="img/logo_joinville.png" alt="Joinville" style="height:44px" onerror="this.style.display='none'">
           </div>
         </div>
 

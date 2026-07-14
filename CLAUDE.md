@@ -20,7 +20,7 @@ Arquitetura: GitHub Pages + JSON (Python ETL) + HTML/JS/CSS + Chart.js 4 + Leafl
 
 ## Deploy
 - **GitHub Pages:** repo `Matheus-Bianco/painel-indicadores-joinville` (branch `main`, via GitHub Actions `.github/workflows/deploy.yml`, publica a pasta `painel/`).
-- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=25`, `app.js?v=68`. **Sempre incrementar ao alterar CSS/JS** (senão o GitHub Pages serve cache antigo).
+- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=26`, `app.js?v=69`. **Sempre incrementar ao alterar CSS/JS** (senão o GitHub Pages serve cache antigo).
 - Histórico de `.git` reescrito uma vez (orphan commit) para remover JSON de 99 MB (`4_11_desigualdades.json`).
 
 ## Estrutura do projeto
