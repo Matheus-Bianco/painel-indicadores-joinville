@@ -1744,8 +1744,8 @@ body.sidebar-hidden .main-scroll #main-content {
   justify-content: center;
   padding: 32px 40px;
   box-sizing: border-box;
-  background-color: #003866;
-  background-image: url('../img/transparente_alunos_jv.png');
+  background-color: #1E5A8C;
+  background-image: url('../img/transparente_alunos_jv.png?v=2');
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
