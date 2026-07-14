@@ -1760,12 +1760,15 @@ body.sidebar-hidden .main-scroll #main-content {
 .home-banner-flag {
   height: 72px;
   width: auto;
+  max-width: 280px;
   flex-shrink: 0;
-  border-radius: 8px;
-  background: #fff;
-  padding: 6px 8px;
-  box-shadow: 0 3px 14px rgba(0, 0, 0, .22);
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
   object-fit: contain;
+  /* logo_joinville.png = branco/transparente — precisa do azul do banner */
+  filter: none;
 }
 
 .home-banner-title {
@@ -1983,7 +1986,8 @@ body.sidebar-hidden .main-scroll #main-content {
 
 .home-footer-logos img {
   height: 44px;
-  filter: none;
+  /* logo branca: inverte para azul escuro no fundo claro */
+  filter: brightness(0) saturate(100%) invert(14%) sepia(55%) saturate(2469%) hue-rotate(190deg) brightness(95%) contrast(101%);
   transition: transform .2s;
 }
 
