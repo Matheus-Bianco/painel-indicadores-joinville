@@ -20,7 +20,7 @@ Arquitetura: GitHub Pages + JSON (Python ETL) + HTML/JS/CSS + Chart.js 4 + Leafl
 
 ## Deploy
 - **GitHub Pages:** repo `Matheus-Bianco/painel-indicadores-joinville` (branch `main`, via GitHub Actions `.github/workflows/deploy.yml`, publica a pasta `painel/`).
-- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=24`, `app.js?v=67`. **Sempre incrementar ao alterar CSS/JS** (senão o GitHub Pages serve cache antigo).
+- Cache-busting: querystring `?v=NN` em `index.html` (CSS e `app.js`). Atual: `styles.css?v=25`, `app.js?v=68`. **Sempre incrementar ao alterar CSS/JS** (senão o GitHub Pages serve cache antigo).
 - Histórico de `.git` reescrito uma vez (orphan commit) para remover JSON de 99 MB (`4_11_desigualdades.json`).
 
 ## Estrutura do projeto
@@ -126,6 +126,13 @@ etl_*.py          → Scripts ETL que geram os JSONs
 3. **`por_escola_recente`** é uma **lista** (não dict); match por `cod_escola === inep`. Nem toda escola (162) tem rendimento (85) — tratar estado vazio.
 
 ## Histórico de evolução
+### 14/jul/2026 — Sync UX com painel RS (sem Redes/SAERS)
+- **Home:** formato banner institucional (como RS), identidade Joinville (`#003866` + logo); bloco "Documentos e Recursos" (Área de Extração + Caderno INEP + Portal Censo); card Visão por Escola em `col-span-2`.
+- **Export CSV:** botão no rodapé `.chart-source` (`export-btn--footer`); metadata com "Recorte geográfico"; reinjeção pós-filtro em Acesso.
+- **Visão por Escola:** `renderBoletimMatriculas` (histórico `mat_hist`); seleção explícita por INEP (`S.escolaInepSel`).
+- **Fora desta rodada (guardado):** Visão por Redes (ETL multi-rede no município); SAERS / Desigualdades / prova local (Diagnóstica Bússola).
+- Deploy: repo `Matheus-Bianco/painel-indicadores-joinville` apenas (não mexer no RS).
+
 ### 28/jun/2026 — Sincronização com painel UNESCO (`commit 3a0570d`)
 - **Fluxo:** ETL reescrito para base consolidada INEP (2010-2025), `por_municipio` dos 295 municípios de SC + `serie_municipios_sc` (média). Nova seção **"Rendimento por Série"** (1º-9º ano) que reage ao filtro de Ano (corrige bug do filtro "sem efeito"); `S.anoSel` agora é sincronizado em `renderFluxo`.
 - **Comparação municipal:** novo módulo (só `JV_MODE`) com lista suspensa dos 295 municípios + linha "Média municípios de SC" (`fluxoBuildComparacao`, `FLX_COMP_METRICS`, `.flx-comp-select`).
@@ -138,6 +145,7 @@ etl_*.py          → Scripts ETL que geram os JSONs
 - Header reduzido a filtro de Ano; Distribuição Territorial por escola (Infra/Docência/AFD/ICG/Fluxo) e removida onde não há dado por escola (IDEB/SAEB/TDI/INSE) (`commit ea19bab`).
 
 ## Próximos passos sugeridos
-- Definir avaliação local (Diagnóstica Bússola) para a aba oculta (SAERS).
-- Seção Desigualdade (raça/cor, sexo) — evolução futura.
+- Visão por Redes no município de Joinville (Federal × Estadual × Municipal × Privada em 4209102) — ETL `4_1_redes.json`.
+- Definir avaliação local (Diagnóstica Bússola) para a aba oculta (SAERS) e Desigualdades.
+- Evoluir Área de Extração para pacotes `.xlsx` + `manifest.json` (padrão Central de Dados RS), se desejado.
 - Substituir bases RS remanescentes em `00. Bases de Dados/` por extrações de Joinville.

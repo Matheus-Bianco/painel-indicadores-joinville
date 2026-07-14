@@ -67,9 +67,13 @@ const S = {
   // Multi-rede support (Joinville: apenas municipal)
   redeSel: JV_MODE ? 'municipal' : 'estadual',
   redeCache: {},         // { estadual: { acesso: data, infra: data }, ... }
+  escolaInepSel: null,   // seleção explícita por INEP (Visão por Escola)
 };
 
-const FONTE_CENSO = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px" title="Acessar Censo Escolar no portal INEP">Censo Escolar da Educação Básica</a> · <a href="https://download.inep.gov.br/publicacoes/institucionais/estatisticas_e_indicadores/cadernos_de_conceitos_2025.pdf" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px" title="Acessar o Caderno de Conceitos e Orientações 2025">📘 Caderno do Censo 2025</a>';
+const URL_CENSO = 'https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar';
+const URL_CADERNO_CENSO = 'https://download.inep.gov.br/publicacoes/institucionais/estatisticas_e_indicadores/cadernos_de_conceitos_2025.pdf';
+
+const FONTE_CENSO = 'Fonte: INEP — <a href="' + URL_CENSO + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px" title="Acessar Censo Escolar no portal INEP">Censo Escolar da Educação Básica</a> · <a href="' + URL_CADERNO_CENSO + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px" title="Acessar o Caderno de Conceitos e Orientações 2025">Caderno do Censo 2025</a>';
 
 // Paleta Bandeira RS: Verde #00AB4E, Vermelho #EE302F, Amarelo #FFCB04
 const COLORS = {
@@ -262,7 +266,21 @@ function getExportSource() {
     saers: 'SAERS/CAED — Avaliação do Estado do Rio Grande do Sul',
     desigualdades: 'INEP — Indicadores Educacionais',
   };
-  return (sources[v] || 'INEP') + ', extraído e tratado pela equipe SEDUC / Unesco';
+  return (sources[v] || 'INEP') + (JV_MODE
+    ? ', Secretaria de Educação de Joinville'
+    : ', extraído e tratado pela equipe SEDUC / Unesco');
+}
+
+/** Rótulo geográfico ativo para exportação */
+function getExportGeoLabel() {
+  if (JV_MODE) return JV.munNome + ' (SC)';
+  if (S.munSel) {
+    return S.data?.lookup_municipios?.[S.munSel] || S._universalMunLookup?.[S.munSel] || S.munSel;
+  }
+  if (S.creSel) {
+    return S.creLookup?.cre_list?.find(c => c.cod_cre === S.creSel)?.nome_cre || `CRE ${S.creSel}`;
+  }
+  return 'Rio Grande do Sul (estado)';
 }
 
 /**
@@ -285,6 +303,7 @@ function exportChartCSV(btn) {
   const metaRows = [
     ['Fonte', getExportSource()],
     ['Rede', getRedeLabel()],
+    ['Recorte geográfico', getExportGeoLabel()],
     ['Ano/Edicao', S.anoSel || 'Geral'],
     ['Tabela', title],
     []
@@ -424,29 +443,60 @@ function exportTableCSV(btn) {
 
 /** Add export CSV buttons to all chart-cards and data-tables */
 function injectExportButtons() {
-  // Charts
+  // Charts — botão no rodapé (chart-source) para não sobrepor filtros/legendas
   document.querySelectorAll('.chart-card canvas').forEach(canvas => {
     const card = canvas.closest('.chart-card');
-    if (!card || card.querySelector('.export-btn')) return;
+    if (!card) return;
+    card.querySelectorAll('.export-btn').forEach(b => b.remove());
     const btn = document.createElement('button');
     btn.className = 'export-btn';
     btn.title = 'Baixar dados (CSV/Excel)';
-    btn.innerHTML = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><polyline points=\"14 2 14 8 20 8\"/><line x1=\"16\" y1=\"13\" x2=\"8\" y2=\"13\"/><line x1=\"16\" y1=\"17\" x2=\"8\" y2=\"17\"/></svg>';
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>CSV</span>';
     btn.addEventListener('click', function(e) { e.stopPropagation(); exportChartCSV(this); });
-    card.style.position = 'relative';
-    card.appendChild(btn);
+    const source = card.querySelector('.chart-source');
+    if (source) {
+      btn.classList.add('export-btn--footer');
+      source.classList.add('chart-source--with-export');
+      if (![...source.childNodes].some(n => n.nodeType === 1 && n.classList?.contains('chart-source-text'))) {
+        const textBits = [];
+        [...source.childNodes].forEach(n => {
+          if (n.nodeType === 3 && n.textContent.trim()) textBits.push(n.textContent.trim());
+          else if (n.nodeType === 1 && !n.classList.contains('chart-source-actions')) textBits.push(n.textContent.trim());
+        });
+        source.querySelectorAll(':scope > :not(.chart-source-actions)').forEach(el => el.remove());
+        [...source.childNodes].forEach(n => { if (n.nodeType === 3) n.remove(); });
+        const textEl = document.createElement('span');
+        textEl.className = 'chart-source-text';
+        textEl.textContent = textBits.join(' ') || source.textContent.trim();
+        source.insertBefore(textEl, source.firstChild);
+      }
+      let wrap = source.querySelector('.chart-source-actions');
+      if (!wrap) {
+        wrap = document.createElement('span');
+        wrap.className = 'chart-source-actions';
+        source.appendChild(wrap);
+      } else {
+        wrap.innerHTML = '';
+      }
+      wrap.appendChild(btn);
+    } else {
+      btn.classList.add('export-btn--float');
+      card.style.position = 'relative';
+      card.appendChild(btn);
+    }
   });
 
   // Tables
   document.querySelectorAll('.data-table').forEach(table => {
     const wrapper = table.closest('.table-wrapper') || table.closest('.chart-card');
-    if (!wrapper || wrapper.querySelector('.export-table-btn')) return;
+    if (!wrapper) return;
+    wrapper.querySelectorAll('.export-table-btn').forEach(b => b.remove());
     const header = wrapper.querySelector('.table-header');
     if (!header) return;
     const btn = document.createElement('button');
     btn.className = 'export-table-btn';
     btn.title = 'Baixar tabela (CSV)';
-    btn.innerHTML = '📥 CSV';
+    btn.innerHTML = 'CSV';
     btn.style.cssText = 'font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #ccc;background:#fff;cursor:pointer;font-family:Inter;font-weight:600;color:#555;margin-left:auto;transition:all .2s';
     btn.addEventListener('mouseenter', () => { btn.style.background = '#f0f0f0'; });
     btn.addEventListener('mouseleave', () => { btn.style.background = '#fff'; });
@@ -1832,6 +1882,7 @@ function applyMunFilter(d, anoSel, lookup) {
     }
   }
   injectExportButtons();
+  requestAnimationFrame(() => injectExportButtons());
 }
 
 /** Build race/sex/integral/locdif charts — uses municipality data when available */
@@ -5462,39 +5513,26 @@ function renderHome() {
     { view: 'docencia', icon: 'img/icons/sec_docentes.png', title: 'Docência', desc: 'Perfil, vínculo e distribuição docente' },
     { view: 'afd', icon: 'img/icons/professor.png', title: 'Formação Docente', desc: 'Adequação da formação por etapa' },
     { view: 'fluxo', icon: 'img/icons/sec_evolucao.png', title: 'Fluxo e Rendimento', desc: 'Aprovação, reprovação e abandono' },
-    { view: 'saers', icon: 'img/icons/sec_saeb.png', title: 'SAERS', desc: 'Avaliação Estadual — Proficiência e Padrão de Desempenho' },
-    { view: 'desigualdades', icon: 'img/icons/nav_desigualdades.png', title: 'Desigualdades', desc: 'Desigualdades no desempenho por raça, sexo, localização e outros recortes' },
+    { view: 'tdi', icon: 'img/icons/politicas.png', title: 'Distorção Idade-Série', desc: 'Taxa de defasagem escolar por etapa' },
     { view: 'saeb', icon: 'img/icons/sec_saeb.png', title: 'SAEB', desc: 'Proficiência em Língua Portuguesa e Matemática' },
     { view: 'ideb', icon: 'img/icons/nav_ideb.png', title: 'IDEB', desc: 'Índice de Desenvolvimento da Educação Básica' },
-    { view: 'tdi', icon: 'img/icons/politicas.png', title: 'Distorção Idade-Série', desc: 'Taxa de defasagem escolar por etapa' },
     { view: 'escolas', icon: 'img/icons/escola.png', title: 'Visão por Escola', desc: 'Mapa georreferenciado com indicadores por escola' },
-    { view: 'extracao', icon: 'img/icons/panorama.png', title: 'Área de Extração', desc: 'Baixe as planilhas (CSV/JSON) dos dados do painel' },
-  ].filter(s => !JV_MODE || !['saers', 'desigualdades'].includes(s.view));
+  ];
 
   main.innerHTML = `
     <div class="home-wrap">
-      <div class="home-bg"></div>
-      <div class="home-particles">
-        <div class="home-particle"></div>
-        <div class="home-particle"></div>
-        <div class="home-particle"></div>
-        <div class="home-particle"></div>
-        <div class="home-particle"></div>
-        <div class="home-particle"></div>
-      </div>
+      <header class="home-banner" role="banner">
+        <div class="home-banner-inner">
+          <img class="home-banner-flag" src="img/logo_joinville.png" alt="Logo Joinville">
+          <h1 class="home-banner-title">
+            <span class="home-banner-title-main">Painel de Dados Abertos</span>
+            <span class="home-banner-title-sub">Educação — Joinville/SC</span>
+          </h1>
+        </div>
+      </header>
       <div class="home-content">
 
-        <div class="home-hero" style="margin-bottom:28px">
-          <div class="home-hero-badge">${JV_MODE ? 'Secretaria de Educação de Joinville/SC' : 'Secretaria de Estado da Educação do Rio Grande do Sul'}</div>
-          <h1>Painel de <span>${JV_MODE ? 'Dados' : 'Indicadores'} Abertos</span></h1>
-          <p class="home-hero-sub">
-            ${JV_MODE
-              ? 'Plataforma analítica com indicadores educacionais da rede municipal de Joinville/SC'
-              : 'Plataforma analítica com dados abertos do Censo Escolar, SAEB e indicadores educacionais da rede estadual do Rio Grande do Sul'}
-          </p>
-        </div>
-
-        <div class="home-divider" style="margin:20px 0 16px">
+        <div class="home-divider" style="margin:8px 0 16px">
           <span class="home-divider-line"></span>
           <span class="home-divider-text">Explorar Seções</span>
           <span class="home-divider-line"></span>
@@ -5502,7 +5540,7 @@ function renderHome() {
 
         <div class="home-grid">
           ${sections.map((s, i) => `
-            <div class="home-card" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .06}s both">
+            <div class="home-card ${s.view === 'escolas' ? 'col-span-2' : ''}" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .06}s both">
               <div class="home-card-icon"><img src="${s.icon}" alt=""></div>
               <div class="home-card-text">
                 <div class="home-card-title">${s.title}</div>
@@ -5513,17 +5551,46 @@ function renderHome() {
           `).join('')}
         </div>
 
+        <div class="home-divider" style="margin:28px 0 16px">
+          <span class="home-divider-line"></span>
+          <span class="home-divider-text">Documentos e Recursos</span>
+          <span class="home-divider-line"></span>
+        </div>
+
+        <div class="home-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="home-card" data-nav="extracao" style="cursor:pointer">
+            <div class="home-card-icon"><img src="img/icons/territorial.png" alt=""></div>
+            <div class="home-card-text">
+              <div class="home-card-title">Área de Extração</div>
+              <div class="home-card-desc">Baixe as bases do painel em CSV ou JSON, por tema</div>
+            </div>
+            <span class="home-card-arrow">›</span>
+          </div>
+          <a class="home-card" href="${URL_CADERNO_CENSO}" target="_blank" rel="noopener" style="text-decoration:none">
+            <div class="home-card-icon"><img src="img/icons/politicas.png" alt=""></div>
+            <div class="home-card-text">
+              <div class="home-card-title">Caderno de Conceitos do Censo</div>
+              <div class="home-card-desc">Definições e orientações oficiais dos indicadores (INEP) — PDF</div>
+            </div>
+            <span class="home-card-arrow">↗</span>
+          </a>
+          <a class="home-card" href="${URL_CENSO}" target="_blank" rel="noopener" style="text-decoration:none">
+            <div class="home-card-icon"><img src="img/icons/panorama.png" alt=""></div>
+            <div class="home-card-text">
+              <div class="home-card-title">Portal do Censo Escolar (INEP)</div>
+              <div class="home-card-desc">Microdados, notas técnicas e indicadores educacionais</div>
+            </div>
+            <span class="home-card-arrow">↗</span>
+          </a>
+        </div>
+
         <div class="home-footer" style="margin-top:32px">
-          ${JV_MODE ? '' : `<div class="home-footer-text">
-            Dados: INEP — Censo Escolar da Educação Básica & Microdados SAEB<br>
-            Desenvolvido no âmbito do contrato UNESCO / SEDUC-RS
-          </div>`}
+          <div class="home-footer-text">
+            Secretaria de Educação de Joinville<br>
+            Painel de Dados Abertos da Educação — Rede Municipal
+          </div>
           <div class="home-footer-logos">
-            ${JV_MODE
-              ? '<img src="img/logo_joinville.png" alt="Joinville" style="height:56px" onerror="this.style.display=\'none\'">'
-              : `<img src="img/logo_rs.avif" alt="Governo RS" style="height:56px" onerror="this.style.display='none'">
-            <img src="img/UNESCO_logo_white.png" alt="UNESCO" style="height:52px;filter:none" onerror="this.style.display='none'">
-            <img src="img/logo_cebe.png" alt="CEBE" style="height:56px" onerror="this.style.display='none'">`}
+            <img src="img/logo_joinville.png" alt="Joinville" style="height:56px" onerror="this.style.display='none'">
           </div>
         </div>
 
@@ -5531,7 +5598,6 @@ function renderHome() {
     </div>
   `;
 
-  // Make cards clickable → navigate to section
   main.querySelectorAll('.home-card[data-nav]').forEach(card => {
     card.addEventListener('click', () => {
       const view = card.dataset.nav;
@@ -12366,7 +12432,7 @@ function renderEscolas() {
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:350px;margin-left:auto;position:relative">
           <label style="font-size:11px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:0.5px">Buscar escola:</label>
-          <input type="text" id="escola-search" placeholder="Nome ou município..." autocomplete="off" style="padding:6px 12px;border-radius:8px;border:1px solid #e0e0e0;font-size:12px;font-family:Inter;width:100%;background:#f9fafb;color:#333;outline:none;transition:all 0.2s">
+          <input type="text" id="escola-search" placeholder="Nome ou código INEP..." autocomplete="off" style="padding:6px 12px;border-radius:8px;border:1px solid #e0e0e0;font-size:12px;font-family:Inter;width:100%;background:#f9fafb;color:#333;outline:none;transition:all 0.2s">
           <div id="escola-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e0e0;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.1);z-index:1500;max-height:300px;overflow-y:auto;margin-top:4px"></div>
         </div>
       </div>
@@ -12848,28 +12914,82 @@ function renderEscolas() {
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     window.renderBoletimFluxo(e.inep);
+    window.renderBoletimMatriculas(e.inep);
     // Rendimento por série da escola (dados recentes do INEP por escola)
     const _recSerieEsc = (S.fluxo?.por_escola_recente || S.fluxo?.por_escola_2025 || [])
       .find(x => String(x.cod_escola) === String(e.inep));
     fluxoBuildSerieChart(_recSerieEsc || {}, { canvasId: 'boletim-chart-serie', pillsId: 'boletim-serie-pills' });
     if (!JV_MODE) window.renderBoletimSaers(e.inep);
   };
+
+  window.renderBoletimMatriculas = function(inep) {
+    const esc = escolas.find(x => x.inep === inep);
+    const ctx = document.getElementById('boletim-chart-mat');
+    if (!ctx || !esc) return;
+    if (window.boletimMatChart) { window.boletimMatChart.destroy(); window.boletimMatChart = null; }
+
+    const hist = esc.mat_hist || {};
+    const years = Object.keys(hist).sort();
+    if (!years.length) {
+      ctx.parentElement.innerHTML = '<div style="font-size:11px;color:#888;text-align:center;padding:24px 0">Sem histórico de matrículas para esta escola.</div>';
+      return;
+    }
+
+    window.boletimMatChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: [{
+          label: 'Matrículas',
+          data: years.map(y => hist[y]),
+          borderColor: COLORS.pri,
+          backgroundColor: COLORS.pri + '1F',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2.5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { ...DL_LINE, formatter: v => v != null ? formatNumChart(v) : '' }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            suggestedMax: Math.max(...years.map(y => hist[y])) * 1.15,
+            ticks: { callback: v => formatNumChart(v) }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  };
+
   // Update function
   function updateEscolas() {
     const indicator = document.getElementById('escola-indicator').value;
     const creFilter = document.getElementById('escola-cre-filter').value;
-    const search = (document.getElementById('escola-search').value || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const searchRaw = (document.getElementById('escola-search').value || '').trim();
+    const search = searchRaw.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const cfg = ESCOLA_INDICATORS.find(i => i.key === indicator);
 
-    // Filter schools
+    // Filter schools — seleção explícita por INEP (evita duplicatas de nome)
     let filtered = escolas;
     if (creFilter) filtered = filtered.filter(e => e.cre === creFilter);
-    if (search) filtered = filtered.filter(e => {
-      const nome = (e.nome || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const mun = (e.municipio || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const inep = e.inep || '';
-      return nome.includes(search) || mun.includes(search) || inep.includes(search);
-    });
+    if (S.escolaInepSel) {
+      filtered = filtered.filter(e => e.inep === S.escolaInepSel);
+    } else if (search) {
+      filtered = filtered.filter(e => {
+        const nome = (e.nome || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const mun = (e.municipio || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const inep = e.inep || '';
+        return nome.includes(search) || mun.includes(search) || inep.includes(search);
+      });
+    }
 
     const withVal = filtered.filter(e => e[indicator] != null);
     const vals = withVal.map(e => e[indicator]);
@@ -12877,11 +12997,21 @@ function renderEscolas() {
     const minV = vals.length ? Math.min(...vals) : null;
     const maxV = vals.length ? Math.max(...vals) : null;
 
+    const nameCounts = {};
+    filtered.forEach(e => { if (e.nome) nameCounts[e.nome] = (nameCounts[e.nome] || 0) + 1; });
+    const hasDupNames = Object.values(nameCounts).some(c => c > 1);
+    const kpiSub = S.escolaInepSel
+      ? `<div style="font-size:9px;color:#888;margin-top:4px">INEP ${S.escolaInepSel}</div>`
+      : (hasDupNames
+        ? `<div style="font-size:9px;color:#888;margin-top:4px">Busque pelo código INEP se houver nomes iguais</div>`
+        : '');
+
     // KPIs
     document.getElementById('escola-kpis').innerHTML = `
       <div class="kpi-card" style="text-align:center;padding:16px;border-radius:12px;background:linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);box-shadow:0 4px 15px rgba(0,0,0,0.03);border:1px solid #f0f0f0">
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:700">Escolas</div>
-        <div style="font-size:26px;font-weight:800;color:#0D47A1;line-height:1">${filtered.length.toLocaleString('pt-BR')}</div>
+        <div style="font-size:26px;font-weight:800;color:#003866;line-height:1">${filtered.length.toLocaleString('pt-BR')}</div>
+        ${kpiSub}
       </div>
       <div class="kpi-card" style="text-align:center;padding:16px;border-radius:12px;background:linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);box-shadow:0 4px 15px rgba(0,0,0,0.03);border:1px solid #f0f0f0">
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:700">Média ${cfg ? cfg.label.split(' ')[0] : ''}</div>
@@ -12917,14 +13047,13 @@ function renderEscolas() {
         radius: 5, fillColor: color, fillOpacity: 0.85, color: '#fff', weight: 1, opacity: 0.9,
       });
 
-      // Show Boletim instead of Popup on click
-      marker.bindTooltip(`<strong>${e.nome}</strong><br><span style="font-size:10px;color:#666">${e.municipio}</span>`, {direction: 'top'});
+      marker.bindTooltip(`<strong>${e.nome}</strong><br><span style="font-size:10px;color:#666">INEP ${e.inep}</span>`, {direction: 'top'});
       marker.on('click', () => abrirBoletim(e.inep));
       S.escolasMarkers.addLayer(marker);
     }
 
-    // Auto-focus logic: If search leaves only 1 school, show boletim
-    if (search && filtered.length === 1 && filteredWithCoords.length === 1) {
+    // Auto-focus: busca com 1 escola, ou seleção explícita por INEP
+    if ((search || S.escolaInepSel) && filtered.length === 1 && filteredWithCoords.length === 1) {
       abrirBoletim(filteredWithCoords[0].inep);
     } else if (creFilter && filteredWithCoords.length > 0) {
       const bounds = L.latLngBounds(filteredWithCoords.map(e => [e.lat, e.lng]));
@@ -12933,10 +13062,12 @@ function renderEscolas() {
   }
 
   // Bind events
+  S.escolaInepSel = null;
   document.getElementById('escola-indicator').addEventListener('change', updateEscolas);
-  document.getElementById('escola-cre-filter').addEventListener('change', updateEscolas);
+  document.getElementById('escola-cre-filter').addEventListener('change', () => { S.escolaInepSel = null; updateEscolas(); });
   let searchTimeout;
   document.getElementById('escola-search').addEventListener('input', (e) => {
+    S.escolaInepSel = null;
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(updateEscolas, 300);
 
@@ -12944,7 +13075,7 @@ function renderEscolas() {
     const autocompleteBox = document.getElementById('escola-autocomplete');
     if (!autocompleteBox) return;
     const val = (e.target.value || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    if (val.length < 3) {
+    if (val.length < 2) {
       autocompleteBox.style.display = 'none';
       return;
     }
@@ -12962,15 +13093,16 @@ function renderEscolas() {
       autocompleteBox.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:#888">Nenhuma escola encontrada</div>';
     } else {
       autocompleteBox.innerHTML = filtered.map(x => `
-        <div class="escola-ac-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f5f5f5;font-size:11.5px;color:#333" data-inep="${x.inep}">
+        <div class="escola-ac-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f5f5f5;font-size:11.5px;color:#333" data-inep="${x.inep}" data-nome="${(x.nome || '').replace(/"/g, '&quot;')}">
           <div style="font-weight:700;font-size:12px;">${x.nome}</div>
-          <div style="font-size:10px;color:#666">${x.municipio} · ${x.cre}ª CRE · INEP: ${x.inep}</div>
+          <div style="font-size:10px;color:#666">${x.municipio || 'Joinville'} · INEP: ${x.inep}</div>
         </div>
       `).join('');
       
       autocompleteBox.querySelectorAll('.escola-ac-item').forEach(el => {
         el.addEventListener('click', () => {
-          document.getElementById('escola-search').value = el.querySelector('div').textContent;
+          S.escolaInepSel = el.dataset.inep;
+          document.getElementById('escola-search').value = el.dataset.nome || el.querySelector('div').textContent;
           autocompleteBox.style.display = 'none';
           abrirBoletim(el.dataset.inep);
           updateEscolas();
