@@ -12,6 +12,8 @@ import pandas as pd
 import numpy as np
 import json, os, glob, time
 
+from etl_utils_rede import COLS_PARCERIA, resumo_conveniadas
+
 # ══════════════════════════════════════════════════════════════
 # CONFIGURACAO
 # ══════════════════════════════════════════════════════════════
@@ -104,7 +106,8 @@ def ler_microdados_ano(ano: int) -> pd.DataFrame:
     all_desired = (COLS_IDENTIFICACAO + COLS_MATRICULA_ETAPA + COLS_MATRICULA_PERFIL
                    + COLS_FAIXA_ETARIA + COLS_NOTURNO + COLS_NOTURNO_ETAPA
                    + COLS_ESPECIAL + COLS_ESPECIAL_ETAPA
-                   + COLS_INTEGRAL + COLS_ZONA_RESIDENCIA)
+                   + COLS_INTEGRAL + COLS_ZONA_RESIDENCIA
+                   + COLS_PARCERIA)
     use_cols = [c for c in all_desired if c in header.columns]
 
     df = pd.read_csv(filepath, sep=";", encoding="latin-1", usecols=use_cols)
@@ -122,12 +125,12 @@ def ler_tabelas_2025() -> pd.DataFrame:
     print("  Lendo Tabelas 2025...", flush=True)
     t0 = time.time()
 
-    # Tabela_Escola tem os metadados (UF, municipio, dependencia, localizacao)
+    # Tabela_Escola tem os metadados (UF, municipio, dependencia, localizacao, parceria)
     f_escola = os.path.join(MICRO_DIR, "Tabela_Escola_2025.csv")
     escola_cols = ["CO_UF", "CO_MUNICIPIO", "CO_ENTIDADE", "NO_ENTIDADE",
                    "TP_DEPENDENCIA", "TP_CATEGORIA_ESCOLA_PRIVADA",
                    "TP_LOCALIZACAO", "TP_SITUACAO_FUNCIONAMENTO",
-                   "TP_LOCALIZACAO_DIFERENCIADA"]
+                   "TP_LOCALIZACAO_DIFERENCIADA"] + COLS_PARCERIA
     
     h_escola = pd.read_csv(f_escola, sep=";", encoding="latin-1", nrows=0)
     escola_use = [c for c in escola_cols if c in h_escola.columns]
@@ -148,16 +151,48 @@ def ler_tabelas_2025() -> pd.DataFrame:
     df_mat = pd.read_csv(f_mat, sep=";", encoding="latin-1", usecols=mat_use)
     print(f"    Matricula: {len(df_mat)} registros totais")
 
-    # JOIN por CO_ENTIDADE
+    # JOIN por CO_ENTIDADE (left: mantem escolas sem linha em Matricula,
+    # ex. conveniadas de ed. especial com mats nulas no Censo)
     entidades_jlle = set(df_escola["CO_ENTIDADE"].unique())
     df_mat = df_mat[df_mat["CO_ENTIDADE"].isin(entidades_jlle)]
     
-    df = df_escola.merge(df_mat, on="CO_ENTIDADE", how="inner")
+    df = df_escola.merge(df_mat, on="CO_ENTIDADE", how="left")
     df["ANO"] = 2025
+    mat_cols = [c for c in df.columns if c.startswith("QT_MAT_")]
+    if mat_cols:
+        df[mat_cols] = df[mat_cols].fillna(0)
 
     elapsed = time.time() - t0
     print(f"    Resultado: {len(df)} escolas ({elapsed:.1f}s)")
     return df
+
+
+def enriquecer_conveniadas(resultado: dict, df_mun_completo: pd.DataFrame) -> dict:
+    """Injeta contagem/lista de conveniadas municipais (dep4 + parceria mun, sem particular)."""
+    resultado.setdefault("metadata", {})
+    resultado["metadata"]["nota_conveniadas"] = (
+        "Conveniadas = privadas com convenio municipal no Censo "
+        "(exclui categoria particular). KPIs principais = rede direta (dep=3)."
+    )
+    for ano_key, serie in resultado.get("serie_temporal", {}).items():
+        try:
+            ano = int(ano_key)
+        except (TypeError, ValueError):
+            continue
+        df_ano = df_mun_completo[df_mun_completo["ANO"] == ano]
+        r = resumo_conveniadas(df_ano)
+        serie["escolas_conveniadas"] = r["escolas_conveniadas"]
+        serie["mat_conveniadas"] = r["mat_conveniadas"]
+        # lista so no ano mais recente (evita JSON enorme)
+    anos = sorted(resultado.get("serie_temporal", {}).keys())
+    if anos:
+        ultimo = anos[-1]
+        df_u = df_mun_completo[df_mun_completo["ANO"] == int(ultimo)]
+        resultado["inep_conveniadas"] = resumo_conveniadas(df_u)["inep_conveniadas"]
+        resultado["metadata"]["escolas_conveniadas"] = resultado["serie_temporal"][ultimo].get(
+            "escolas_conveniadas", 0
+        )
+    return resultado
 
 
 def calcular_agregacoes(df_all: pd.DataFrame) -> dict:
@@ -538,6 +573,8 @@ if __name__ == "__main__":
         
         resultado = calcular_agregacoes(df_rede)
         resultado = calcular_variacao(resultado)
+        # Conveniadas vem do universo completo do municipio (nao so dep=3)
+        resultado = enriquecer_conveniadas(resultado, df_all)
         resultado["lookup_municipios"] = lookup_municipios
         resultado["metadata"]["rede"] = rede_key
         

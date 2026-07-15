@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 import json, os, re, glob, time, shutil
 
+from etl_utils_rede import COLS_PARCERIA, mask_conveniada_municipal, mask_municipal_direta
+
 BASE = r"c:\Users\mathe\OneDrive\Desktop\Trabalhos\02. Joinville\25. Painel de Indicadores Abertos Joinville\04. Produto 4_Indicadores Educacionais"
 BASES_DADOS = os.path.join(BASE, "00. Bases de Dados")
 PAINEL_DIR = os.path.join(BASE, "painel", "dados")
@@ -70,24 +72,35 @@ def load_coords():
 
 
 def load_base_schools():
-    """Escolas da rede MUNICIPAL de Joinville (Censo Tabela_Escola 2025)."""
+    """Escolas municipais diretas + conveniadas (Censo Tabela_Escola 2025)."""
     fpath = os.path.join(MICRO_DIR, "Tabela_Escola_2025.csv")
     print(f"  Censo: lendo {os.path.basename(fpath)}...")
     use = [
         "CO_ENTIDADE", "NO_ENTIDADE", "CO_MUNICIPIO", "NO_MUNICIPIO",
         "TP_DEPENDENCIA", "TP_SITUACAO_FUNCIONAMENTO", "TP_LOCALIZACAO",
         "LATITUDE", "LONGITUDE", "QT_SALAS_UTILIZADAS",
-    ]
+        "TP_CATEGORIA_ESCOLA_PRIVADA",
+    ] + COLS_PARCERIA
     h = pd.read_csv(fpath, sep=";", encoding="latin-1", nrows=0)
     cols = [c for c in use if c in h.columns]
     df = pd.read_csv(fpath, sep=";", encoding="latin-1", usecols=cols)
     df = df[
         (df["CO_MUNICIPIO"] == CO_MUN_JOINVILLE)
-        & (df["TP_DEPENDENCIA"] == 3)
         & (df["TP_SITUACAO_FUNCIONAMENTO"] == 1)
     ].copy()
+    if "TP_CATEGORIA_ESCOLA_PRIVADA" in df.columns:
+        df["TP_CATEGORIA_ESCOLA_PRIVADA"] = df["TP_CATEGORIA_ESCOLA_PRIVADA"].fillna(0)
+
+    mask_dir = mask_municipal_direta(df)
+    mask_conv = mask_conveniada_municipal(df)
+    df = df[mask_dir | mask_conv].copy()
+    df["tipo_rede"] = "conveniada"
+    df.loc[mask_municipal_direta(df), "tipo_rede"] = "direta"
+
     df["INEP"] = df["CO_ENTIDADE"].astype(int).astype(str)
-    print(f"  Censo: {len(df)} escolas municipais Joinville")
+    n_dir = int((df["tipo_rede"] == "direta").sum())
+    n_conv = int((df["tipo_rede"] == "conveniada").sum())
+    print(f"  Censo: {len(df)} escolas ({n_dir} diretas + {n_conv} conveniadas)")
     return df
 
 
@@ -349,7 +362,6 @@ def load_censo_hist(muni_inep):
         df = pd.read_csv(fpath, sep=";", encoding="latin-1", usecols=use)
         df = df[
             (df["CO_MUNICIPIO"] == CO_MUN_JOINVILLE)
-            & (df["TP_DEPENDENCIA"] == 3)
             & (df["TP_SITUACAO_FUNCIONAMENTO"] == 1)
         ]
         for _, row in df.iterrows():
@@ -450,6 +462,7 @@ def main():
             'cre': '',
             'loc': LOC_MAP.get(loc_raw, str(loc_raw)),
             'salas': si(row['QT_SALAS_UTILIZADAS']) if 'QT_SALAS_UTILIZADAS' in row and pd.notna(row.get('QT_SALAS_UTILIZADAS')) else None,
+            'tipo_rede': str(row.get('tipo_rede', 'direta')),
         }
 
         if inep in coords:
@@ -475,6 +488,8 @@ def main():
         escolas.append(escola)
 
     total = len(escolas)
+    n_dir = sum(1 for e in escolas if e.get('tipo_rede') != 'conveniada')
+    n_conv = sum(1 for e in escolas if e.get('tipo_rede') == 'conveniada')
     with_coords = sum(1 for e in escolas if e.get('lat'))
     output = {
         'metadata': {
@@ -482,8 +497,14 @@ def main():
             'municipio': 'Joinville',
             'uf': 'SC',
             'rede': 'Municipal',
+            'nota_conveniadas': (
+                'Conveniadas = privadas com convenio municipal no Censo '
+                '(exclui categoria particular).'
+            ),
             'gerado_em': pd.Timestamp.now().isoformat(),
             'total_escolas': total,
+            'escolas_diretas': n_dir,
+            'escolas_conveniadas': n_conv,
             'com_coordenadas': with_coords,
         },
         'escolas': escolas,
@@ -499,7 +520,7 @@ def main():
     shutil.copy2(out_main, out_compat)
 
     print(f"\n  JSON: escolas_municipais.json ({size_kb:.0f} KB)")
-    print(f"  Total: {total} | Com coords: {with_coords} ({100*with_coords/total:.1f}%)")
+    print(f"  Total: {total} ({n_dir} diretas + {n_conv} conveniadas) | Com coords: {with_coords} ({100*with_coords/total:.1f}%)")
     print(f"    SED Joinville: {stats['coords_sed']} | Censo fallback: {stats['coords_censo']} | Sem: {stats['sem_coords']}")
     print(f"  IDEB: {sum(1 for e in escolas if 'ideb_ai' in e or 'ideb_af' in e)}")
     print(f"  INSE: {sum(1 for e in escolas if 'inse_media' in e)}")

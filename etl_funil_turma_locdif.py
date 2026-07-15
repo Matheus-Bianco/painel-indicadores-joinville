@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 import json, os, glob, time
 
+from etl_utils_rede import COLS_PARCERIA, resumo_conveniadas
+
 BASE = r"c:\Users\mathe\OneDrive\Desktop\Trabalhos\02. Joinville\25. Painel de Indicadores Abertos Joinville\04. Produto 4_Indicadores Educacionais"
 _bd = os.path.join(BASE, "00. Bases de Dados")
 _d1 = [d for d in os.listdir(_bd) if d.startswith("01.")][0]
@@ -70,13 +72,23 @@ def processar_2025(resultado):
 
     # 1. Escola: filtro Joinville + ativas + rede municipal (dep=3)
     esc_cols = ["CO_MUNICIPIO", "CO_ENTIDADE", "TP_DEPENDENCIA",
-                "TP_SITUACAO_FUNCIONAMENTO", "TP_LOCALIZACAO_DIFERENCIADA"]
+                "TP_SITUACAO_FUNCIONAMENTO", "TP_LOCALIZACAO_DIFERENCIADA",
+                "TP_CATEGORIA_ESCOLA_PRIVADA"] + COLS_PARCERIA
     h_esc = list(pd.read_csv(f_escola, sep=";", encoding="latin-1", nrows=0).columns)
     esc_use = [c for c in esc_cols if c in h_esc]
-    df_esc = pd.read_csv(f_escola, sep=";", encoding="latin-1", usecols=esc_use)
-    df_esc = df_esc[(df_esc["CO_MUNICIPIO"] == CO_MUN_JOINVILLE) &
-                    (df_esc["TP_SITUACAO_FUNCIONAMENTO"] == 1) &
-                    (df_esc["TP_DEPENDENCIA"] == 3)]
+    df_esc_all = pd.read_csv(f_escola, sep=";", encoding="latin-1", usecols=esc_use)
+    df_esc_all = df_esc_all[(df_esc_all["CO_MUNICIPIO"] == CO_MUN_JOINVILLE) &
+                            (df_esc_all["TP_SITUACAO_FUNCIONAMENTO"] == 1)]
+    if "TP_CATEGORIA_ESCOLA_PRIVADA" in df_esc_all.columns:
+        df_esc_all["TP_CATEGORIA_ESCOLA_PRIVADA"] = df_esc_all["TP_CATEGORIA_ESCOLA_PRIVADA"].fillna(0)
+    conv = resumo_conveniadas(df_esc_all)
+    resultado["metadata"]["escolas_conveniadas"] = conv["escolas_conveniadas"]
+    resultado["metadata"]["inep_conveniadas"] = conv["inep_conveniadas"]
+    resultado["metadata"]["nota_conveniadas"] = (
+        "Conveniadas = privadas com convenio municipal no Censo (exclui particular). "
+        "Funil/turma = rede direta (dep=3)."
+    )
+    df_esc = df_esc_all[df_esc_all["TP_DEPENDENCIA"] == 3]
     entidades = set(df_esc["CO_ENTIDADE"].unique())
 
     # 2. Matricula: funil por serie + turno por etapa

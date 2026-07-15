@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 import json, os, glob, time
 
+from etl_utils_rede import COLS_PARCERIA, resumo_conveniadas
+
 BASE = r"c:\Users\mathe\OneDrive\Desktop\Trabalhos\02. Joinville\25. Painel de Indicadores Abertos Joinville\04. Produto 4_Indicadores Educacionais"
 MICRO_DIR = None  # resolved dynamically
 OUT_DIR = os.path.join(BASE, "painel", "dados")
@@ -185,7 +187,7 @@ def etl_infraestrutura():
 
     # Process each year — read ALL schools once per CSV
     micros = sorted(glob.glob(os.path.join(MICRO_DIR, "microdados_ed_basica_*.*")))
-    id_cols = ["CO_UF","CO_MUNICIPIO","CO_ENTIDADE","TP_DEPENDENCIA","TP_CATEGORIA_ESCOLA_PRIVADA","TP_LOCALIZACAO","TP_SITUACAO_FUNCIONAMENTO"]
+    id_cols = ["CO_UF","CO_MUNICIPIO","CO_ENTIDADE","TP_DEPENDENCIA","TP_CATEGORIA_ESCOLA_PRIVADA","TP_LOCALIZACAO","TP_SITUACAO_FUNCIONAMENTO"] + COLS_PARCERIA
 
     # Store raw DataFrames per year for re-filtering
     dfs_por_ano = {}  # {ano_str: DataFrame}
@@ -241,6 +243,10 @@ def etl_infraestrutura():
 
         resultado = {
             "metadata": {"fonte": "Censo Escolar INEP — IN_*", "uf": "SC", "municipio": "Joinville", "rede": rede_key,
+                          "nota_conveniadas": (
+                              "Conveniadas = privadas com convenio municipal no Censo "
+                              "(exclui categoria particular). KPIs = rede direta (dep=3)."
+                          ),
                           "gerado_em": pd.Timestamp.now().isoformat()},
             "categorias": INFRA_CATEGORIES,
             "labels": INFRA_INDICATORS,
@@ -277,7 +283,12 @@ def etl_infraestrutura():
                     total_salas = int(df["QT_SALAS_UTILIZADAS"].sum())
                     total_clim = int(df["QT_SALAS_UTILIZA_CLIMATIZADAS"].sum())
                     stats["PCT_SALAS_CLIMATIZADAS"] = {"total_salas": total_salas, "total_clim": total_clim, "pct": safe_pct(total_clim, total_salas)}
-            resultado["serie_temporal"][ano] = {"total_escolas": n, "indicadores": stats}
+            conv = resumo_conveniadas(df_full)
+            resultado["serie_temporal"][ano] = {
+                "total_escolas": n,
+                "escolas_conveniadas": conv["escolas_conveniadas"],
+                "indicadores": stats,
+            }
 
             # Por dependencia (within filtered set — useful for 'todas')
             dep_map = {1:"Federal", 2:"Estadual", 3:"Municipal", 4:"Privada"}

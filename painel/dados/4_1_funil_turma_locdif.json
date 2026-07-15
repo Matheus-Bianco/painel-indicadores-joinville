@@ -4,7 +4,15 @@
     "uf": "SC",
     "municipio": "Joinville",
     "rede": "municipal",
-    "gerado_em": "2026-06-16T10:28:32.714222"
+    "gerado_em": "2026-07-15T07:25:09.309936",
+    "escolas_conveniadas": 4,
+    "inep_conveniadas": [
+      "42119782",
+      "42119790",
+      "42119812",
+      "42216206"
+    ],
+    "nota_conveniadas": "Conveniadas = privadas com convenio municipal no Censo (exclui particular). Funil/turma = rede direta (dep=3)."
   },
   "funil_por_serie": {
     "2023": {
