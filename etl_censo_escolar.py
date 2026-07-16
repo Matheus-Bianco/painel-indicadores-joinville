@@ -27,9 +27,14 @@ os.makedirs(OUT_DIR, exist_ok=True)
 CO_MUN_JOINVILLE = 4209102   # código IBGE de Joinville
 CO_UF_SC = 42                # Santa Catarina (referência)
 
-# Configuracao de rede — Joinville: APENAS rede MUNICIPAL (dep=3).
+# Redes dentro do municipio de Joinville (CO_MUNICIPIO ja filtrado na leitura).
+# Particular = TP_CATEGORIA_ESCOLA_PRIVADA == 1; Filantropica == 4.
 REDES = {
     'municipal':     {'dep': [3], 'cat_priv': None},
+    'estadual':      {'dep': [2], 'cat_priv': None},
+    'federal':       {'dep': [1], 'cat_priv': None},
+    'filantropica':  {'dep': [4], 'cat_priv': 4},
+    'particular':    {'dep': [4], 'cat_priv': 1},
 }
 
 # Colunas que existem em TODOS os anos (2010-2024)
@@ -520,7 +525,7 @@ def filtrar_rede(df_all: pd.DataFrame, rede_key: str) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("ETL CENSO ESCOLAR — Joinville/SC (rede municipal)")
+    print("ETL CENSO ESCOLAR — Joinville/SC (multi-rede municipal)")
     print("=" * 70)
     
     t_total = time.time()

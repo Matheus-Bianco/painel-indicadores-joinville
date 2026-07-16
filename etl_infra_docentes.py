@@ -19,9 +19,14 @@ OUT_DIR = os.path.join(BASE, "painel", "dados")
 os.makedirs(OUT_DIR, exist_ok=True)
 CO_MUN_JOINVILLE = 4209102  # código IBGE de Joinville/SC
 
-# Configuracao de rede — Joinville: APENAS rede MUNICIPAL (dep=3).
+# Redes dentro do municipio de Joinville (CO_MUNICIPIO ja filtrado na leitura).
+# Particular = TP_CATEGORIA_ESCOLA_PRIVADA == 1; Filantropica == 4.
 REDES = {
     'municipal':     {'dep': [3], 'cat_priv': None},
+    'estadual':      {'dep': [2], 'cat_priv': None},
+    'federal':       {'dep': [1], 'cat_priv': None},
+    'filantropica':  {'dep': [4], 'cat_priv': 4},
+    'particular':    {'dep': [4], 'cat_priv': 1},
 }
 
 MICRO_DIR = os.path.join(BASE, "00. Bases de Dados", "01. Acesso e Matrículas (Censo Escolar_2010_2025)", "01. extrações_2010_2025")

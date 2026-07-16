@@ -3,7 +3,7 @@
  * app.js — Carrega JSON e renderiza gráficos Chart.js
  */
 
-// Recorte municipal Joinville (rede municipal exclusiva)
+// Recorte municipal Joinville (dependências dentro do município)
 const JV = {
   munCod: '4209102',
   munNome: 'Joinville',
@@ -82,7 +82,7 @@ const COLORS = {
   red: '#EE302F', redLight: '#F4706F',
   yellow: '#FFCB04', yellowLight: '#FFE066',
   accent: '#FFCB04', accentLight: '#FFE066',
-  federal: '#1565C0', estadual: '#2E6FA0', municipal: '#003866', privada: '#6A1B9A',
+  federal: '#1565C0', estadual: '#2E6FA0', municipal: '#003866', privada: '#6A1B9A', particular: '#6A1B9A', filantropica: '#7B1FA2',
   masc: '#1976D2', fem: '#EE302F',
   branca: '#78909C', preta: '#37474F', parda: '#8D6E63', amarela: '#FFCB04', indigena: '#2E6FA0', nd: '#B0BEC5',
   infantil: '#FFCB04', fundAI: '#0097A7', fundAF: '#F57C00', fundamental: '#003866', medio: '#EE302F', eja: '#1565C0', especial: '#6A1B9A', blue: '#1565C0',
@@ -97,8 +97,14 @@ const DL_LINE = { display: true, anchor: 'end', align: 'top', offset: 3, font: {
 const DL_DONUT = { display: true, font: { family: 'Inter', size: 10, weight: '700' }, color: '#fff', formatter: (v, ctx) => { const t = ctx.dataset.data.reduce((a,b) => a+b, 0); const p = (v/t*100); return p >= 5 ? p.toFixed(0) + '%' : ''; } };
 const DL_NONE = { display: false };
 
-// Network labels
-const REDE_LABELS = {
+// Network labels (JV: dependências dentro do município; RS: redes do estado)
+const REDE_LABELS = JV_MODE ? {
+  municipal: 'Municipal',
+  estadual: 'Estadual',
+  federal: 'Federal',
+  filantropica: 'Filantrópica',
+  particular: 'Particular',
+} : {
   estadual: 'Rede Estadual',
   municipal: 'Rede Municipal',
   federal: 'Rede Federal',
@@ -107,9 +113,17 @@ const REDE_LABELS = {
   todas: 'Todas as Redes',
 };
 
+/** Views com JSON multi-dependência em Joinville */
+const JV_MULTI_REDE_VIEWS = new Set(['acesso', 'infra', 'docencia']);
+
 /** Subtítulo geográfico das seções */
 function sectionSubtitle() {
-  return JV_MODE ? `Rede Municipal — ${JV.munNome}/${JV.uf}` : getRedeLabel() + ' do RS';
+  if (JV_MODE) {
+    const v = S._currentView || '';
+    const label = JV_MULTI_REDE_VIEWS.has(v) ? getRedeLabel() : (REDE_LABELS.municipal || 'Municipal');
+    return `${label} — ${JV.munNome}/${JV.uf}`;
+  }
+  return getRedeLabel() + ' do RS';
 }
 
 /** Código IBGE de um feature GeoJSON (RS usa cod_mun; Joinville usa codarea) */
@@ -566,14 +580,17 @@ function sectionBanner(icon, title, subtitle, opts = {}) {
  *  @param {string} [disabledMsg] - tooltip message for disabled buttons
  */
 function redeToggleHTML(disabledRedes, disabledMsg) {
-  if (JV_MODE || !sectionBanner._lastShowToggle) return '';
+  if (!sectionBanner._lastShowToggle) return '';
+  // Em Joinville o toggle multi-dependência vale para Acesso, Infra e Docência
+  if (JV_MODE && !JV_MULTI_REDE_VIEWS.has(S._currentView || '')) return '';
   const disabled = new Set(disabledRedes || []);
   return `<div class="rede-toggle-strip" id="rede-toggle">
     ${Object.entries(REDE_LABELS).map(([k, label]) => {
       const isDisabled = disabled.has(k);
       const cls = k === S.redeSel ? ' active' : (isDisabled ? ' disabled' : '');
       const title = isDisabled ? ` title="${disabledMsg || 'Indisponível'}"` : '';
-      return `<button class="rede-toggle-btn${cls}" data-rede="${k}"${title}${isDisabled ? ' disabled' : ''}>${label.replace('Rede ','')}</button>`;
+      const btnLabel = label.replace(/^Rede\s+/, '');
+      return `<button class="rede-toggle-btn${cls}" data-rede="${k}"${title}${isDisabled ? ' disabled' : ''}>${btnLabel}</button>`;
     }).join('')}
   </div>`;
 }
@@ -589,9 +606,6 @@ function getRedeLabel() {
 
 /** Lazy-load JSON data for a given rede. Returns cached if already loaded. */
 async function loadRedeData(rede) {
-  if (JV_MODE && rede !== 'municipal') {
-    return { acesso: null, infra: null, fluxo: null, saeb: null, inse: null, icg: null, afd: null, ideb: null, tdi: null, saers: null, saersEscolas: null, docentes: null };
-  }
   if (S.redeCache[rede]?.acesso && S.redeCache[rede]?.infra) {
     return S.redeCache[rede];
   }
@@ -660,18 +674,24 @@ async function switchRede(rede) {
       // Re-populate municipality dropdown
       populateMunDropdown(S.creSel);
     }
-    // Always assign — null clears old rede data so guards display "not available"
-    S.infra = cached.infra;
-    S.fluxo = cached.fluxo;
-    S.saeb  = cached.saeb;
-    S.inse  = cached.inse;
-    S.icg   = cached.icg;
-    S.afd   = cached.afd;
-    S.ideb  = cached.ideb;
-    S.tdi   = cached.tdi;
-    S.saersData = cached.saers;
-    S.saersEscolasData = cached.saersEscolas;
-    S.doc   = cached.docentes;
+    if (JV_MODE) {
+      // Multi-dependência só para Acesso / Infra / Docência (recorte Joinville)
+      if (cached.infra) S.infra = cached.infra;
+      if (cached.docentes) S.doc = cached.docentes;
+    } else {
+      // Always assign — null clears old rede data so guards display "not available"
+      S.infra = cached.infra;
+      S.fluxo = cached.fluxo;
+      S.saeb  = cached.saeb;
+      S.inse  = cached.inse;
+      S.icg   = cached.icg;
+      S.afd   = cached.afd;
+      S.ideb  = cached.ideb;
+      S.tdi   = cached.tdi;
+      S.saersData = cached.saers;
+      S.saersEscolasData = cached.saersEscolas;
+      S.doc   = cached.docentes;
+    }
     // Update rede toggle active state
     document.querySelectorAll('.rede-toggle-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.rede === rede);
@@ -689,11 +709,13 @@ async function switchRede(rede) {
 function bindRedeToggle() {
   const toggle = document.getElementById('rede-toggle');
   if (!toggle) return;
-  toggle.addEventListener('click', e => {
+  if (toggle._redeHandler) toggle.removeEventListener('click', toggle._redeHandler);
+  toggle._redeHandler = e => {
     const btn = e.target.closest('.rede-toggle-btn');
-    if (!btn || btn.dataset.rede === S.redeSel) return;
+    if (!btn || btn.disabled || btn.dataset.rede === S.redeSel) return;
     switchRede(btn.dataset.rede);
-  });
+  };
+  toggle.addEventListener('click', toggle._redeHandler);
 }
 
 
