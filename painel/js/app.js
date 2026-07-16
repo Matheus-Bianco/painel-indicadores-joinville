@@ -5555,8 +5555,24 @@ function renderHome() {
   destroyCharts();
   destroyMap();
   document.body.classList.add('sidebar-hidden');
-  const sections = [
-    { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo 2022' },
+
+  const cardHTML = (s, i) => `
+    <div class="home-card" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .05}s both">
+      <div class="home-card-icon"><img src="${s.icon}" alt=""></div>
+      <div class="home-card-text">
+        <div class="home-card-title">${s.title}</div>
+        <div class="home-card-desc">${s.desc}</div>
+      </div>
+      <span class="home-card-arrow">›</span>
+    </div>`;
+
+  // Contexto demográfico (IBGE) — separado do Censo Escolar / indicadores educacionais
+  const demoSections = [
+    { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo Demográfico 2022' },
+  ];
+
+  // Indicadores educacionais (Censo Escolar INEP + avaliações)
+  const eduSections = [
     { view: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas', desc: 'Evolução, etapas e recortes demográficos' },
     { view: 'redes', icon: 'img/icons/panorama.png', title: 'Visão por Redes', desc: 'Comparativo por dependência: escolas, alunos, docentes e etapas' },
     { view: 'infra', icon: 'img/icons/nav_infra.png', title: 'Infraestrutura', desc: 'Recursos físicos e tecnológicos das escolas' },
@@ -5586,21 +5602,22 @@ function renderHome() {
 
         <div class="home-divider">
           <span class="home-divider-line"></span>
-          <span class="home-divider-text">Explorar Seções</span>
+          <span class="home-divider-text">Contexto Demográfico — IBGE</span>
           <span class="home-divider-line"></span>
         </div>
+        <p class="home-section-note">Dados populacionais do Censo Demográfico (IBGE), usados como referência para metas do PME.</p>
+        <div class="home-grid home-grid-demo">
+          ${demoSections.map((s, i) => cardHTML(s, i)).join('')}
+        </div>
 
+        <div class="home-divider">
+          <span class="home-divider-line"></span>
+          <span class="home-divider-text">Indicadores Educacionais — Censo Escolar e Avaliações</span>
+          <span class="home-divider-line"></span>
+        </div>
+        <p class="home-section-note">Oferta, docentes, fluxo e avaliações oficiais (INEP) da educação básica em Joinville.</p>
         <div class="home-grid">
-          ${sections.map((s, i) => `
-            <div class="home-card ${s.view === 'escolas' ? 'col-span-2' : ''}" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .06}s both">
-              <div class="home-card-icon"><img src="${s.icon}" alt=""></div>
-              <div class="home-card-text">
-                <div class="home-card-title">${s.title}</div>
-                <div class="home-card-desc">${s.desc}</div>
-              </div>
-              <span class="home-card-arrow">›</span>
-            </div>
-          `).join('')}
+          ${eduSections.map((s, i) => cardHTML(s, i + 1)).join('')}
         </div>
 
         <div class="home-divider">
@@ -5609,8 +5626,8 @@ function renderHome() {
           <span class="home-divider-line"></span>
         </div>
 
-        <div class="home-grid" style="grid-template-columns:repeat(3,1fr)">
-          <div class="home-card" data-nav="extracao" style="cursor:pointer">
+        <div class="home-grid home-grid-3">
+          <div class="home-card" data-nav="extracao">
             <div class="home-card-icon"><img src="img/icons/territorial.png" alt=""></div>
             <div class="home-card-text">
               <div class="home-card-title">Área de Extração</div>
@@ -5618,7 +5635,7 @@ function renderHome() {
             </div>
             <span class="home-card-arrow">›</span>
           </div>
-          <a class="home-card" href="${URL_CADERNO_CENSO}" target="_blank" rel="noopener" style="text-decoration:none">
+          <a class="home-card" href="${URL_CADERNO_CENSO}" target="_blank" rel="noopener">
             <div class="home-card-icon"><img src="img/icons/politicas.png" alt=""></div>
             <div class="home-card-text">
               <div class="home-card-title">Caderno de Conceitos do Censo</div>
@@ -5626,7 +5643,7 @@ function renderHome() {
             </div>
             <span class="home-card-arrow">↗</span>
           </a>
-          <a class="home-card" href="${URL_CENSO}" target="_blank" rel="noopener" style="text-decoration:none">
+          <a class="home-card" href="${URL_CENSO}" target="_blank" rel="noopener">
             <div class="home-card-icon"><img src="img/icons/panorama.png" alt=""></div>
             <div class="home-card-text">
               <div class="home-card-title">Portal do Censo Escolar (INEP)</div>
