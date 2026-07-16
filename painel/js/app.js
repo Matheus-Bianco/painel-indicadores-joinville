@@ -102,13 +102,13 @@ const REDE_LABELS = JV_MODE ? {
   municipal: 'Municipal',
   estadual: 'Estadual',
   federal: 'Federal',
-  filantropica: 'Filantrópica',
+  filantropica: 'Filantropica',
   particular: 'Particular',
 } : {
   estadual: 'Rede Estadual',
   municipal: 'Rede Municipal',
   federal: 'Rede Federal',
-  filantropica: 'Rede Filantrópica',
+  filantropica: 'Rede Filantropica',
   privada: 'Rede Privada',
   todas: 'Todas as Redes',
 };
@@ -641,7 +641,13 @@ async function loadRedeData(rede) {
   const result = {};
   for (let i = 0; i < keys.length; i++) {
     const r = responses[i];
-    result[keys[i]] = (r && r.ok) ? await r.json() : null;
+    if (!(r && r.ok)) { result[keys[i]] = null; continue; }
+    try {
+      result[keys[i]] = await r.json();
+    } catch (err) {
+      console.warn(`[loadRedeData] JSON invalido: ${urls[i]}`, err);
+      result[keys[i]] = null;
+    }
   }
   S.redeCache[rede] = result;
   return result;
@@ -669,20 +675,26 @@ async function switchRede(rede) {
   if (rede === S.redeSel && S.redeCache[rede]?.acesso && (!JV_MODE || S.redeCache[rede]?.escolas)) return;
   showRedeLoading(rede);
   try {
-    const cached = await loadRedeData(rede);
-    S.redeSel = rede;
-    if (cached.acesso) {
-      S.data = cached.acesso;
-      // Re-populate year dropdown for this rede
-      const anos = Object.keys(S.data.serie_temporal).sort();
-      const selAno = document.getElementById('sel-ano');
-      if (selAno) {
-        selAno.innerHTML = anos.map(a => `<option value="${a}" ${a === anos[anos.length - 1] ? 'selected' : ''}>${a}</option>`).join('');
-        S.anoSel = anos[anos.length - 1];
-      }
-      // Re-populate municipality dropdown
-      populateMunDropdown(S.creSel);
+    // Em JV, limpa cache de escolas se veio nulo (ex.: JSON invalido antigo com NaN)
+    if (JV_MODE && S.redeCache[rede] && !S.redeCache[rede].escolas) {
+      delete S.redeCache[rede];
     }
+    const cached = await loadRedeData(rede);
+    if (!cached.acesso) {
+      console.warn(`[switchRede] sem dados de acesso para ${rede}`);
+      return;
+    }
+    S.redeSel = rede;
+    S.data = cached.acesso;
+    // Re-populate year dropdown for this rede
+    const anos = Object.keys(S.data.serie_temporal).sort();
+    const selAno = document.getElementById('sel-ano');
+    if (selAno) {
+      selAno.innerHTML = anos.map(a => `<option value="${a}" ${a === anos[anos.length - 1] ? 'selected' : ''}>${a}</option>`).join('');
+      S.anoSel = anos[anos.length - 1];
+    }
+    // Re-populate municipality dropdown
+    populateMunDropdown(S.creSel);
     if (JV_MODE) {
       // Multi-dependência só para Acesso / Infra / Docência (recorte Joinville)
       if (cached.infra) S.infra = cached.infra;
@@ -690,7 +702,7 @@ async function switchRede(rede) {
       // Mapa/tabela territorial: trocar escolas da dependencia selecionada
       S.escolasData = cached.escolas || { escolas: [], metadata: { rede, total_escolas: 0 } };
       S.mapMode = 'esc';
-      destroyMap();
+      try { destroyMap(); } catch (e) { console.warn('destroyMap', e); S.map = null; S.mapLayer = null; }
     } else {
       // Always assign — null clears old rede data so guards display "not available"
       S.infra = cached.infra;
@@ -713,6 +725,8 @@ async function switchRede(rede) {
     const sub = document.getElementById('rede-subtitle');
     if (sub) sub.textContent = sectionSubtitle();
     refreshActiveTab();
+  } catch (err) {
+    console.error(`[switchRede] falha ao carregar ${rede}:`, err);
   } finally {
     hideRedeLoading();
   }
@@ -11501,7 +11515,7 @@ function buildEscolaLayer(d, anoSel) {
   if (!JV_MODE && S.creSel) filtered = filtered.filter(e => e.cre === S.creSel);
   if (S.munSel && !JV_MODE) filtered = filtered.filter(e => String(e.cod_mun) === String(S.munSel));
 
-  const withCoords = filtered.filter(e => e.lat && e.lng);
+  const withCoords = filtered.filter(e => Number.isFinite(+e.lat) && Number.isFinite(+e.lng));
 
   const markers = L.featureGroup();
   addJoinvilleContour(markers);

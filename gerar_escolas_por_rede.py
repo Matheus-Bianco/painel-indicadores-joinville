@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 
@@ -55,20 +56,34 @@ def load_coords():
     return coords
 
 
+def _valid_coord(lat, lng):
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(lat) and math.isfinite(lng)):
+        return None
+    if lat == 0 and lng == 0:
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return round(lat, 6), round(lng, 6)
+
+
 def attach_coords(e, row, coords):
     inep = e["inep"]
     if inep in coords:
-        e["lat"], e["lng"], e["coord_fonte"] = coords[inep]
-        return
-    try:
-        lat = float(row.get("LATITUDE"))
-        lng = float(row.get("LONGITUDE"))
-        if lat and lng and lat != 0 and lng != 0:
-            e["lat"] = round(lat, 6)
-            e["lng"] = round(lng, 6)
-            e["coord_fonte"] = "Censo"
-    except Exception:
-        pass
+        lat, lng, fonte = coords[inep]
+        pair = _valid_coord(lat, lng)
+        if pair:
+            e["lat"], e["lng"] = pair
+            e["coord_fonte"] = fonte
+            return
+    pair = _valid_coord(row.get("LATITUDE"), row.get("LONGITUDE"))
+    if pair:
+        e["lat"], e["lng"] = pair
+        e["coord_fonte"] = "Censo"
 
 
 def load_matriculas():
@@ -144,7 +159,8 @@ def save(rede, escolas, fname):
     }
     out = os.path.join(PAINEL, fname)
     with open(out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        # allow_nan=False evita NaN invalido que quebra JSON.parse no browser
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     print(f"  {fname}: {len(escolas)} escolas | {n_coord} coords | mat={mat}")
 
 
