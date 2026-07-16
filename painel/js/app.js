@@ -604,13 +604,21 @@ function getRedeLabel() {
   return REDE_LABELS[S.redeSel] || 'Rede Estadual';
 }
 
+/** Arquivo de escolas por dependencia (mapa territorial Joinville). */
+function escolasFileForRede(rede) {
+  if (!JV_MODE) return 'dados/escolas_municipais.json';
+  if (rede === 'municipal') return 'dados/escolas_municipais.json';
+  return `dados/escolas_${rede}.json`;
+}
+
 /** Lazy-load JSON data for a given rede. Returns cached if already loaded. */
 async function loadRedeData(rede) {
-  if (S.redeCache[rede]?.acesso && S.redeCache[rede]?.infra) {
-    return S.redeCache[rede];
-  }
+  // Em Joinville, exige também escolas da dependencia (mapa territorial)
+  const cacheOk = S.redeCache[rede]?.acesso && S.redeCache[rede]?.infra
+    && (!JV_MODE || S.redeCache[rede]?.escolas);
+  if (cacheOk) return S.redeCache[rede];
   // Fetch all data sources in parallel; 404s handled gracefully
-  const keys = ['acesso', 'infra', 'fluxo', 'saeb', 'inse', 'icg', 'afd', 'ideb', 'tdi', 'saers', 'saersEscolas', 'docentes'];
+  const keys = ['acesso', 'infra', 'fluxo', 'saeb', 'inse', 'icg', 'afd', 'ideb', 'tdi', 'saers', 'saersEscolas', 'docentes', 'escolas'];
   const urls = [
     `dados/4_1_acesso_${rede}.json`,
     `dados/4_5_infra_${rede}.json`,
@@ -625,7 +633,8 @@ async function loadRedeData(rede) {
     rede === 'estadual' ? `dados/4_saers_escolas.json`
       : rede === 'municipal' ? `dados/4_saers_escolas_municipal.json`
       : `dados/4_saers_escolas_${rede}.json`, // will 404 gracefully for other redes
-    `dados/4_5_docentes_${rede}.json`
+    `dados/4_5_docentes_${rede}.json`,
+    escolasFileForRede(rede),
   ];
   const cb = '_cb=' + Date.now();
   const responses = await Promise.all(urls.map(u => fetch(u + '?' + cb).catch(() => null)));
@@ -657,7 +666,7 @@ function hideRedeLoading() {
 
 /** Switch to a new network — loads data if needed, swaps pointers, refreshes view */
 async function switchRede(rede) {
-  if (rede === S.redeSel && S.redeCache[rede]?.acesso) return;
+  if (rede === S.redeSel && S.redeCache[rede]?.acesso && (!JV_MODE || S.redeCache[rede]?.escolas)) return;
   showRedeLoading(rede);
   try {
     const cached = await loadRedeData(rede);
@@ -678,6 +687,10 @@ async function switchRede(rede) {
       // Multi-dependência só para Acesso / Infra / Docência (recorte Joinville)
       if (cached.infra) S.infra = cached.infra;
       if (cached.docentes) S.doc = cached.docentes;
+      // Mapa/tabela territorial: trocar escolas da dependencia selecionada
+      S.escolasData = cached.escolas || { escolas: [], metadata: { rede, total_escolas: 0 } };
+      S.mapMode = 'esc';
+      destroyMap();
     } else {
       // Always assign — null clears old rede data so guards display "not available"
       S.infra = cached.infra;
@@ -1236,15 +1249,8 @@ function updateKPIs(ano, su, d) {
     const abs = absFn(val, prevVal);
     const sparkSvg = buildSparkline(k.key, k.altKey || k.key, accentColors[k.accent]);
     const sign = abs > 0 ? '+' : '';
-    const nConv = (k.key === 'total_escolas')
-      ? (su.escolas_conveniadas ?? d.metadata?.escolas_conveniadas ?? null)
-      : null;
-    const convNote = (nConv != null && nConv > 0)
-      ? `<div class="kpi-conv-note" title="Privadas com convenio municipal no Censo (exclui categoria particular)">${nConv} conveniada${nConv === 1 ? '' : 's'}</div>`
-      : '';
-
     return `
-    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${k.label}: ${formatNum(val)} (${anos[0]}–${ano})${nConv ? ` | ${nConv} conveniadas` : ''}">
+    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${k.label}: ${formatNum(val)} (${anos[0]}–${ano})">
       <div class="kpi-top">
         <span class="kpi-label">${k.label}</span>
         <img class="kpi-icon" src="${k.icon}" alt="${k.label}">
@@ -1253,7 +1259,6 @@ function updateKPIs(ano, su, d) {
         <span class="kpi-value" data-target="${val}">${formatNum(val)}</span>
         ${sparkSvg}
       </div>
-      ${convNote}
       <div class="kpi-footer">
         ${delta != null ? `
           <span class="kpi-delta ${deltaClass(delta)}">
@@ -2746,15 +2751,8 @@ function buildInfraKPIs(infra, ano, anos) {
     const arrow = pct !== null ? (pct >= 0 ? '↑' : '↓') : '';
     const sparkline = buildSparkInfra(sparkKeys[i], sparkColors[i]);
     const absStr = k.fmt === 'pct' ? (abs !== null ? `${abs >= 0 ? '+' : ''}${abs.toFixed(1)}pp` : '') : (abs !== null ? `${abs >= 0 ? '+' : ''}${formatNum(abs)}` : '');
-    const nConv = (k.key === 'total_escolas')
-      ? (su?.escolas_conveniadas ?? infra.metadata?.escolas_conveniadas ?? null)
-      : null;
-    const convNote = (JV_MODE && nConv != null && nConv > 0)
-      ? `<div class="kpi-conv-note" title="Privadas com convenio municipal no Censo">${nConv} conveniada${nConv === 1 ? '' : 's'}</div>`
-      : '';
-
     return `
-    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${k.label}: ${displayVal}${nConv ? ` | ${nConv} conveniadas` : ''}">
+    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${k.label}: ${displayVal}">
       <div class="kpi-top">
         <span class="kpi-label">${k.label}</span>
         <img class="kpi-icon" src="${k.icon}" alt="${k.label}">
@@ -2763,7 +2761,6 @@ function buildInfraKPIs(infra, ano, anos) {
         <span class="kpi-value">${displayVal}</span>
         ${sparkline}
       </div>
-      ${convNote}
       <div class="kpi-footer">
         <span class="kpi-delta ${cls}">${arrow} ${pct !== null ? (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' : ''}</span>
         <span class="kpi-abs">${absStr} ${!munMode ? refLabel : ''}</span>
@@ -11484,14 +11481,15 @@ function buildEscolaLayer(d, anoSel) {
   if (S.mapLayer) { S.mapLayer.remove(); S.mapLayer = null; }
   if (S.mapLegend) { S.mapLegend.remove(); S.mapLegend = null; }
 
-  // Load escola data
+  // Load escola data (deve acompanhar a dependencia selecionada em JV_MODE)
   const ed = S.escolasData;
   if (!ed || !ed.escolas || !ed.escolas.length) {
     // Show message in table
     const titleEl = document.querySelector('#mun-table-wrapper .table-header h3');
     if (titleEl) titleEl.textContent = 'Tabela de Escolas';
     const tbody = document.getElementById('mun-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#999">Dados de escolas não carregados</td></tr>';
+    const redeLbl = getRedeLabel();
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#999">Nenhuma escola com coordenadas para ${redeLbl}</td></tr>`;
     return;
   }
 
@@ -12775,15 +12773,6 @@ function renderEscolas() {
             ${ESCOLA_INDICATORS.map(i => `<option value="${i.key}" ${i.key === defaultIndicator ? 'selected' : ''}>${i.label}</option>`).join('')}
           </select>
         </div>
-        ${JV_MODE ? `
-        <div style="display:flex;align-items:center;gap:8px">
-          <label style="font-size:11px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:0.5px">Rede:</label>
-          <select id="escola-tipo-rede" style="padding:6px 12px;border-radius:8px;border:1px solid #e0e0e0;font-size:12px;font-family:Inter;background:#f9fafb;cursor:pointer;color:#333;outline:none;transition:all 0.2s">
-            <option value="todas">Todas</option>
-            <option value="direta" selected>Diretas</option>
-            <option value="conveniada">Conveniadas</option>
-          </select>
-        </div>` : ''}
         <div style="display:${JV_MODE ? 'none' : 'flex'};align-items:center;gap:8px">
           <label style="font-size:11px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:0.5px">CRE:</label>
           <select id="escola-cre-filter" style="padding:6px 12px;border-radius:8px;border:1px solid #e0e0e0;font-size:12px;font-family:Inter;background:#f9fafb;cursor:pointer;color:#333;outline:none;transition:all 0.2s">
@@ -12826,9 +12815,6 @@ function renderEscolas() {
 
       <div style="text-align:right;margin-top:8px;font-size:9px;color:#aaa">
         Fonte: Censo Escolar 2025 / INEP — Indicadores por escola | ${withCoords.length} escolas georreferenciadas
-        ${JV_MODE && (ed.metadata?.escolas_conveniadas || 0) > 0
-          ? ` | ${(ed.metadata.escolas_diretas ?? (ed.escolas.filter(x => x.tipo_rede !== 'conveniada').length))} diretas + ${ed.metadata.escolas_conveniadas} conveniadas`
-          : ''}
       </div>
     </div>
   `;
@@ -13126,9 +13112,6 @@ function renderEscolas() {
             <h2 style="margin:0;font-size:24px;font-weight:800;color:#0D47A1;line-height:1.2">${e.nome}</h2>
             <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
               <span style="background:#e3f2fd;color:#1565c0;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">${e.municipio}</span>
-              ${e.tipo_rede === 'conveniada'
-                ? '<span style="background:#fff8e1;color:#b8860b;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">Conveniada</span>'
-                : '<span style="background:#e8f5e9;color:#2e7d32;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">Direta</span>'}
               ${e.cre ? `<span style="background:#fff3e0;color:#e65100;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">${e.cre}ª CRE</span>` : ''}
               <span style="background:#f5f5f5;color:#555;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">INEP: ${e.inep}</span>
               <span style="color:#888;font-size:11px">${e.loc || 'Urbana'}</span>
@@ -13340,15 +13323,12 @@ function renderEscolas() {
   function updateEscolas() {
     const indicator = document.getElementById('escola-indicator').value;
     const creFilter = document.getElementById('escola-cre-filter')?.value || '';
-    const tipoRede = document.getElementById('escola-tipo-rede')?.value || 'todas';
     const searchRaw = (document.getElementById('escola-search').value || '').trim();
     const search = searchRaw.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const cfg = ESCOLA_INDICATORS.find(i => i.key === indicator);
 
     // Filter schools — seleção explícita por INEP (evita duplicatas de nome)
     let filtered = escolas;
-    if (tipoRede === 'direta') filtered = filtered.filter(e => (e.tipo_rede || 'direta') !== 'conveniada');
-    else if (tipoRede === 'conveniada') filtered = filtered.filter(e => e.tipo_rede === 'conveniada');
     if (creFilter) filtered = filtered.filter(e => e.cre === creFilter);
     if (S.escolaInepSel) {
       filtered = filtered.filter(e => e.inep === S.escolaInepSel);
@@ -13370,15 +13350,11 @@ function renderEscolas() {
     const nameCounts = {};
     filtered.forEach(e => { if (e.nome) nameCounts[e.nome] = (nameCounts[e.nome] || 0) + 1; });
     const hasDupNames = Object.values(nameCounts).some(c => c > 1);
-    const nConvFiltered = filtered.filter(e => e.tipo_rede === 'conveniada').length;
-    const nDirFiltered = filtered.length - nConvFiltered;
     const kpiSub = S.escolaInepSel
       ? `<div style="font-size:9px;color:#888;margin-top:4px">INEP ${S.escolaInepSel}</div>`
       : (hasDupNames
         ? `<div style="font-size:9px;color:#888;margin-top:4px">Busque pelo código INEP se houver nomes iguais</div>`
-        : (JV_MODE && tipoRede === 'todas' && nConvFiltered > 0
-          ? `<div style="font-size:9px;color:#888;margin-top:4px">${nDirFiltered} diretas · ${nConvFiltered} conveniadas</div>`
-          : ''));
+        : '');
 
     // KPIs
     document.getElementById('escola-kpis').innerHTML = `
@@ -13417,18 +13393,16 @@ function renderEscolas() {
     for (const e of filteredWithCoords) {
       const val = e[indicator];
       const color = getEscolaColor(val, indicator);
-      const isConv = e.tipo_rede === 'conveniada';
       const marker = L.circleMarker([e.lat, e.lng], {
-        radius: isConv ? 6 : 5,
+        radius: 5,
         fillColor: color,
         fillOpacity: 0.85,
-        color: isConv ? '#d4a84b' : '#fff',
-        weight: isConv ? 2 : 1,
+        color: '#fff',
+        weight: 1,
         opacity: 0.9,
       });
 
-      const badgeTip = isConv ? '<br><span style="font-size:10px;color:#b8860b;font-weight:700">Conveniada</span>' : '';
-      marker.bindTooltip(`<strong>${e.nome}</strong><br><span style="font-size:10px;color:#666">INEP ${e.inep}</span>${badgeTip}`, {direction: 'top'});
+      marker.bindTooltip(`<strong>${e.nome}</strong><br><span style="font-size:10px;color:#666">INEP ${e.inep}</span>`, {direction: 'top'});
       marker.on('click', () => abrirBoletim(e.inep));
       S.escolasMarkers.addLayer(marker);
     }
@@ -13446,7 +13420,6 @@ function renderEscolas() {
   S.escolaInepSel = null;
   document.getElementById('escola-indicator').addEventListener('change', updateEscolas);
   document.getElementById('escola-cre-filter')?.addEventListener('change', () => { S.escolaInepSel = null; updateEscolas(); });
-  document.getElementById('escola-tipo-rede')?.addEventListener('change', () => { S.escolaInepSel = null; updateEscolas(); });
   let searchTimeout;
   document.getElementById('escola-search').addEventListener('input', (e) => {
     S.escolaInepSel = null;
@@ -13462,10 +13435,7 @@ function renderEscolas() {
       return;
     }
     const creFilter = document.getElementById('escola-cre-filter')?.value || '';
-    const tipoRede = document.getElementById('escola-tipo-rede')?.value || 'todas';
     let filtered = S.escolasData.escolas || [];
-    if (tipoRede === 'direta') filtered = filtered.filter(x => (x.tipo_rede || 'direta') !== 'conveniada');
-    else if (tipoRede === 'conveniada') filtered = filtered.filter(x => x.tipo_rede === 'conveniada');
     if (creFilter) filtered = filtered.filter(x => x.cre === creFilter);
     filtered = filtered.filter(x => {
       const nome = (x.nome || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -13479,7 +13449,7 @@ function renderEscolas() {
     } else {
       autocompleteBox.innerHTML = filtered.map(x => `
         <div class="escola-ac-item" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f5f5f5;font-size:11.5px;color:#333" data-inep="${x.inep}" data-nome="${(x.nome || '').replace(/"/g, '&quot;')}">
-          <div style="font-weight:700;font-size:12px;">${x.nome}${x.tipo_rede === 'conveniada' ? ' <span style="color:#b8860b;font-size:10px">(Conveniada)</span>' : ''}</div>
+          <div style="font-weight:700;font-size:12px;">${x.nome}</div>
           <div style="font-size:10px;color:#666">${x.municipio || 'Joinville'} · INEP: ${x.inep}</div>
         </div>
       `).join('');
@@ -15004,6 +14974,7 @@ async function init() {
         acesso: S.data, infra: S.infra, fluxo: S.fluxo, saeb: S.saeb,
         inse: S.inse, icg: S.icg, afd: S.afd, ideb: S.ideb, tdi: S.tdi,
         saers: null, saersEscolas: null, docentes: S.doc,
+        escolas: S.escolasData,
       };
     } else {
       const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respCreGeo, respCreLookup, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respSaers, respSaersEsc, respDesig] = await Promise.all([
