@@ -44,6 +44,7 @@ const S = {
   afd: null,       // 4_9_afd.json — Adequação da Formação Docente
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
+  redesData: null, // 4_1_redes.json — Visão por Redes (comparativo dependências)
   saersData: null,   // 4_saers.json — Avaliação SAERS
   saersEscolasData: null, // 4_saers_escolas.json — SAERS por escola estadual
   escolasData: null, // escolas_estaduais.json — Visão por Escola
@@ -5557,6 +5558,7 @@ function renderHome() {
   const sections = [
     { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo 2022' },
     { view: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas', desc: 'Evolução, etapas e recortes demográficos' },
+    { view: 'redes', icon: 'img/icons/panorama.png', title: 'Visão por Redes', desc: 'Comparativo por dependência: escolas, alunos, docentes e etapas' },
     { view: 'infra', icon: 'img/icons/nav_infra.png', title: 'Infraestrutura', desc: 'Recursos físicos e tecnológicos das escolas' },
     { view: 'icg', icon: 'img/icons/escola.png', title: 'Complexidade de Gestão', desc: 'Níveis de complexidade por escola' },
     { view: 'inse', icon: 'img/icons/nav_desigualdades.png', title: 'Contexto Socioeconômico', desc: 'Indicador INSE por escola e município' },
@@ -10614,7 +10616,7 @@ function initNav() {
 
       // Reset geo/etapa filters ONLY on actual page transition (not refreshActiveTab re-click)
       if (S._currentView && S._currentView !== view) {
-        S.munSel = null;
+        S.munSel = JV_MODE ? JV.munCod : null;
         S.creSel = null;
         S.etapaSel = null;
         S.anoSel = null;  // Reset to latest year
@@ -10629,6 +10631,7 @@ function initNav() {
 
       if (view === 'acesso' && S.data) { renderAcesso(); }
       else if (view === 'censo-ibge') { renderCensoIbge(); }
+      else if (view === 'redes') { ensureRedes(); }
       else if (view === 'fluxo') { renderFluxo(); }
       else if (view === 'infra' && S.infra) { renderInfra(); }
       else if (view === 'docencia' && S.doc) { renderDocencia(); }
@@ -11812,6 +11815,7 @@ function refreshActiveTab() {
   if (view === 'home') renderHome();
   else if (view === 'acesso' && S.data) renderAcesso();
   else if (view === 'censo-ibge') renderCensoIbge();
+  else if (view === 'redes') ensureRedes();
   else if (view === 'fluxo') renderFluxo();
   else if (view === 'infra' && S.infra) renderInfra();
   else if (view === 'docencia' && S.doc) renderDocencia();
@@ -11823,6 +11827,8 @@ function refreshActiveTab() {
   else if (view === 'afd') renderAfd();
   else if (view === 'tdi') renderTdi();
   else if (view === 'desigualdades' && S.desig) renderDesigualdades();
+  else if (view === 'escolas') renderEscolas();
+  else if (view === 'extracao') renderExtracao();
   else if (view === 'escola') renderEscola();
 }
 
