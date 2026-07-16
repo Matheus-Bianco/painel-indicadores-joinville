@@ -9542,14 +9542,40 @@ function renderCensoIbge() {
     </p>
   `;
 
-  // KPIs
+  // KPIs — sempre absoluto + % do total de referência
   const strip = document.getElementById('censo-ibge-kpis');
   if (strip) {
+    const popTot = pop.total || 0;
+    const pop014 = aprox['0_14']?.valor || 0;
+    const alfSim = alf['15_mais_alfabetizados'] || 0;
+    const alfNao = alf['15_mais_nao_alfabetizados'] || 0;
+    const alfTot = alf['15_mais_total'] || (alfSim + alfNao) || 0;
+    const pctOf = (n, den) => (den > 0 ? ((n / den) * 100).toFixed(1) + '%' : '—');
     const kpis = [
-      { label: `População total (${anoRef})`, value: formatNum(pop.total || 0), icon: 'img/icons/panorama.png', accent: 'blue' },
-      { label: '0 a 14 anos', value: formatNum(aprox['0_14']?.valor || 0), icon: 'img/icons/infantil.png', accent: 'green' },
-      { label: 'Alfabetização 15+', value: (alf.taxa_alfabetizacao_15_mais != null ? alf.taxa_alfabetizacao_15_mais.toFixed(1) + '%' : '—'), icon: 'img/icons/sec_saeb.png', accent: 'green' },
-      { label: 'Não alfabetizados 15+', value: formatNum(alf['15_mais_nao_alfabetizados'] || 0), icon: 'img/icons/politicas.png', accent: 'yellow' },
+      {
+        label: `População total (${anoRef})`,
+        value: formatNum(popTot),
+        sub: '100% do município',
+        icon: 'img/icons/panorama.png', accent: 'blue',
+      },
+      {
+        label: '0 a 14 anos',
+        value: formatNum(pop014),
+        sub: pctOf(pop014, popTot) + ' da população total',
+        icon: 'img/icons/infantil.png', accent: 'green',
+      },
+      {
+        label: 'Alfabetizados 15+',
+        value: formatNum(alfSim),
+        sub: pctOf(alfSim, alfTot) + ' da pop. 15 anos ou mais',
+        icon: 'img/icons/sec_saeb.png', accent: 'green',
+      },
+      {
+        label: 'Não alfabetizados 15+',
+        value: formatNum(alfNao),
+        sub: pctOf(alfNao, alfTot) + ' da pop. 15 anos ou mais',
+        icon: 'img/icons/politicas.png', accent: 'yellow',
+      },
     ];
     strip.innerHTML = kpis.map((k, i) => `
       <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms">
@@ -9559,6 +9585,7 @@ function renderCensoIbge() {
         </div>
         <div class="kpi-body">
           <span class="kpi-value">${k.value}</span>
+          <span class="kpi-delta" style="color:#555;font-weight:600">${k.sub}</span>
         </div>
       </div>`).join('');
   }
@@ -9571,12 +9598,16 @@ function renderCensoIbge() {
       aprox['5_14'],
       aprox['15_24'],
     ].filter(Boolean);
-    aproxEl.innerHTML = cards.map(c => `
+    const popTotAprox = pop.total || 0;
+    aproxEl.innerHTML = cards.map(c => {
+      const pct = popTotAprox > 0 ? ((c.valor / popTotAprox) * 100).toFixed(1) + '%' : '—';
+      return `
       <div class="chart-card" style="padding:14px 16px">
         <div style="font-size:11px;font-weight:600;color:var(--pri);margin-bottom:6px">${c.label}</div>
-        <div style="font-size:1.45rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)}</div>
+        <div style="font-size:1.45rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)} <span style="font-size:0.95rem;font-weight:700;color:#555">(${pct})</span></div>
         <div style="font-size:9.5px;color:#888;margin-top:6px;line-height:1.4">${c.nota || ''}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   // Chart: faixas etárias
@@ -9642,10 +9673,10 @@ function renderCensoIbge() {
           legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 }, usePointStyle: true } },
           datalabels: {
             display: true, color: '#fff',
-            font: { family: 'Inter', size: 11, weight: '700' },
+            font: { family: 'Inter', size: 9, weight: '700' },
             formatter: (v, ctx) => {
               const tot = (ctx.chart.data.datasets[0].data || []).reduce((a, b) => a + b, 0) || 1;
-              return ((v / tot) * 100).toFixed(1) + '%';
+              return formatNumChart(v) + '\n' + ((v / tot) * 100).toFixed(1) + '%';
             },
           },
         },
@@ -9675,10 +9706,10 @@ function renderCensoIbge() {
           legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 }, usePointStyle: true } },
           datalabels: {
             display: true, color: '#fff',
-            font: { family: 'Inter', size: 11, weight: '700' },
+            font: { family: 'Inter', size: 9, weight: '700' },
             formatter: (v, ctx) => {
               const tot = (ctx.chart.data.datasets[0].data || []).reduce((a, b) => a + b, 0) || 1;
-              return ((v / tot) * 100).toFixed(1) + '%';
+              return formatNumChart(v) + '\n' + ((v / tot) * 100).toFixed(1) + '%';
             },
           },
         },
