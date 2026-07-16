@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "fonte": "IBGE - Censo Demografico 2022 (Agregados por Municipios)",
+    "arquivos": [
+      "Agregados_por_municipios_demografia_BR.xlsx",
+      "Agregados_por_municipios_alfabetizacao_BR.xlsx"
+    ],
+    "municipio": "Joinville",
+    "uf": "SC",
+    "co_municipio": "4209102",
+    "ano_referencia": 2022,
+    "nota_faixas": "As faixas etarias do Censo 2022 (0-4, 5-9, 10-14, 15-19, 20-24) nao coincidem com as faixas tipicas do PME (0-3, 4-5, 6-14, 15-17, 18-24). Nao ha estimativas anuais 2023/2024 nesta base. Nivel de escolaridade (instrucao) nao esta disponivel nestes arquivos - apenas alfabetizacao.",
+    "gerado_em": "2026-07-16T07:02:13.834084"
+  },
+  "populacao": {
+    "total": 614054,
+    "masculino": 300991,
+    "feminino": 313063,
+    "faixas": [
+      {
+        "key": "0_4",
+        "label": "0 a 4 anos",
+        "valor": 36838
+      },
+      {
+        "key": "5_9",
+        "label": "5 a 9 anos",
+        "valor": 40009
+      },
+      {
+        "key": "10_14",
+        "label": "10 a 14 anos",
+        "valor": 38587
+      },
+      {
+        "key": "15_19",
+        "label": "15 a 19 anos",
+        "valor": 39254
+      },
+      {
+        "key": "20_24",
+        "label": "20 a 24 anos",
+        "valor": 49127
+      },
+      {
+        "key": "25_29",
+        "label": "25 a 29 anos",
+        "valor": 52725
+      },
+      {
+        "key": "30_39",
+        "label": "30 a 39 anos",
+        "valor": 104044
+      },
+      {
+        "key": "40_49",
+        "label": "40 a 49 anos",
+        "valor": 93292
+      },
+      {
+        "key": "50_59",
+        "label": "50 a 59 anos",
+        "valor": 74411
+      },
+      {
+        "key": "60_69",
+        "label": "60 a 69 anos",
+        "valor": 50966
+      },
+      {
+        "key": "70_mais",
+        "label": "70 anos ou mais",
+        "valor": 34716
+      }
+    ],
+    "aproximacoes_pme": {
+      "5_14": {
+        "label": "5 a 14 anos (aprox. PME 6-14)",
+        "valor": 78596,
+        "nota": "Soma das faixas 5-9 e 10-14 do Censo 2022. O PME pede 6-14."
+      },
+      "15_24": {
+        "label": "15 a 24 anos (aprox. PME 15-17 + 18-24)",
+        "valor": 88381,
+        "nota": "Soma das faixas 15-19 e 20-24. O PME pede 15-17 e 18-24 separados."
+      },
+      "0_14": {
+        "label": "0 a 14 anos",
+        "valor": 115434,
+        "nota": "Soma 0-4 + 5-9 + 10-14."
+      }
+    }
+  },
+  "alfabetizacao": {
+    "15_mais_alfabetizados": 490783,
+    "15_mais_nao_alfabetizados": 7550,
+    "15_mais_total": 498333,
+    "taxa_alfabetizacao_15_mais": 98.5,
+    "taxa_analfabetismo_15_mais": 1.5,
+    "por_faixa": [
+      {
+        "label": "15 a 19 anos",
+        "populacao": 39254,
+        "alfabetizados": 38997
+      },
+      {
+        "label": "20 a 24 anos",
+        "populacao": 49127,
+        "alfabetizados": 48877
+      },
+      {
+        "label": "15 a 29 anos",
+        "alfabetizados": 140354,
+        "nao_alfabetizados": 261
+      },
+      {
+        "label": "30 a 59 anos",
+        "alfabetizados": 268876,
+        "nao_alfabetizados": 2347
+      },
+      {
+        "label": "60 anos ou mais",
+        "alfabetizados": 81550,
+        "nao_alfabetizados": 3756
+      }
+    ]
+  }
+}

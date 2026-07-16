@@ -43,6 +43,7 @@ const S = {
   icg: null,       // 4_8_icg.json — Complexidade de Gestão
   afd: null,       // 4_9_afd.json — Adequação da Formação Docente
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
+  censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
   saersData: null,   // 4_saers.json — Avaliação SAERS
   saersEscolasData: null, // 4_saers_escolas.json — SAERS por escola estadual
   escolasData: null, // escolas_estaduais.json — Visão por Escola
@@ -263,6 +264,7 @@ function getExportSource() {
     icg: 'INEP — Indicador de Complexidade de Gestão da Escola',
     afd: 'INEP — Indicador de Adequação da Formação Docente',
     tdi: 'INEP — Indicador de Distorção Idade-Série',
+    'censo-ibge': 'IBGE — Censo Demográfico 2022',
     saers: 'SAERS/CAED — Avaliação do Estado do Rio Grande do Sul',
     desigualdades: 'INEP — Indicadores Educacionais',
   };
@@ -5520,6 +5522,7 @@ function renderHome() {
   destroyMap();
   document.body.classList.add('sidebar-hidden');
   const sections = [
+    { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo 2022' },
     { view: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas', desc: 'Evolução, etapas e recortes demográficos' },
     { view: 'infra', icon: 'img/icons/nav_infra.png', title: 'Infraestrutura', desc: 'Recursos físicos e tecnológicos das escolas' },
     { view: 'icg', icon: 'img/icons/escola.png', title: 'Complexidade de Gestão', desc: 'Níveis de complexidade por escola' },
@@ -9448,6 +9451,286 @@ function renderAfd() {
 }
 
 // ══════════════════════════════════════════════════════════
+// DEMOGRAFIA — CENSO IBGE 2022
+// ══════════════════════════════════════════════════════════
+
+const FONTE_CENSO_IBGE = 'Fonte: IBGE — <a href="https://www.ibge.gov.br/estatisticas/sociais/populacao/22827-censo-demografico-2022.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Censo Demográfico 2022</a> (Agregados por Municípios)';
+
+function renderCensoIbge() {
+  const main = document.getElementById('main-content');
+  destroyCharts(); destroyMap();
+
+  const d = S.censoIbge;
+  if (!d) {
+    main.innerHTML = `
+      <div class="section-sticky">
+        ${sectionBanner('img/icons/panorama.png', 'Demografia (Censo IBGE)', 'Joinville / SC')}
+      </div>
+      <div style="text-align:center;padding:60px 20px;color:var(--text-sec);">
+        <p style="font-size:1.1rem;font-weight:600;">Dados do Censo Demográfico IBGE não disponíveis</p>
+      </div>`;
+    return;
+  }
+
+  const pop = d.populacao || {};
+  const alf = d.alfabetizacao || {};
+  const meta = d.metadata || {};
+  const faixas = pop.faixas || [];
+  const aprox = pop.aproximacoes_pme || {};
+  const anoRef = meta.ano_referencia || 2022;
+
+  main.innerHTML = `
+    <div class="section-sticky">
+      ${sectionBanner('img/icons/panorama.png', 'Demografia (Censo IBGE)', 'Joinville / SC — Censo Demográfico ' + anoRef)}
+      <div class="kpi-strip" id="censo-ibge-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">População por faixa etária</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title">População residente por faixa etária — ${anoRef}</div>
+        <div style="height:280px"><canvas id="censo-ibge-chart-faixas"></canvas></div>
+        <div class="chart-source">${FONTE_CENSO_IBGE}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">População por sexo — ${anoRef}</div>
+        <div style="height:280px"><canvas id="censo-ibge-chart-sexo"></canvas></div>
+        <div class="chart-source">${FONTE_CENSO_IBGE}</div>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/matriculas.png" alt=""></span>
+      <span class="section-divider-text">Faixas de interesse educacional (aproximações)</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div id="censo-ibge-aprox" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px"></div>
+    <p style="font-size:10px;color:#777;margin:0 0 10px;line-height:1.55;font-style:italic">
+      ${meta.nota_faixas || 'As faixas etárias do Censo 2022 não coincidem exatamente com as faixas tipicas do PME.'}
+    </p>
+    <div class="chart-source" style="margin-top:0">${FONTE_CENSO_IBGE}</div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_saeb.png" alt=""></span>
+      <span class="section-divider-text">Alfabetização (15 anos ou mais)</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title">Taxa de alfabetização — 15 anos ou mais (${anoRef})</div>
+        <div style="height:240px"><canvas id="censo-ibge-chart-alf"></canvas></div>
+        <div class="chart-source">${FONTE_CENSO_IBGE}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Alfabetizados e não alfabetizados por faixa etária</div>
+        <div style="height:240px"><canvas id="censo-ibge-chart-alf-faixa"></canvas></div>
+        <div class="chart-source">${FONTE_CENSO_IBGE}</div>
+      </div>
+    </div>
+
+    <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
+      Fonte: IBGE — Censo Demográfico 2022, agregados por municípios
+      (demografia e alfabetização). Município: Joinville/SC (código IBGE ${meta.co_municipio || '4209102'}).
+      Nível de instrução/escolaridade não está disponível nestes arquivos — apenas alfabetização.
+    </p>
+  `;
+
+  // KPIs
+  const strip = document.getElementById('censo-ibge-kpis');
+  if (strip) {
+    const kpis = [
+      { label: `População total (${anoRef})`, value: formatNum(pop.total || 0), icon: 'img/icons/panorama.png', accent: 'blue' },
+      { label: '0 a 14 anos', value: formatNum(aprox['0_14']?.valor || 0), icon: 'img/icons/infantil.png', accent: 'green' },
+      { label: 'Alfabetização 15+', value: (alf.taxa_alfabetizacao_15_mais != null ? alf.taxa_alfabetizacao_15_mais.toFixed(1) + '%' : '—'), icon: 'img/icons/sec_saeb.png', accent: 'green' },
+      { label: 'Não alfabetizados 15+', value: formatNum(alf['15_mais_nao_alfabetizados'] || 0), icon: 'img/icons/politicas.png', accent: 'yellow' },
+    ];
+    strip.innerHTML = kpis.map((k, i) => `
+      <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms">
+        <div class="kpi-top">
+          <span class="kpi-label">${k.label}</span>
+          <img class="kpi-icon" src="${k.icon}" alt="">
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value">${k.value}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  // Aproximações PME
+  const aproxEl = document.getElementById('censo-ibge-aprox');
+  if (aproxEl) {
+    const cards = [
+      aprox['0_14'],
+      aprox['5_14'],
+      aprox['15_24'],
+    ].filter(Boolean);
+    aproxEl.innerHTML = cards.map(c => `
+      <div class="chart-card" style="padding:14px 16px">
+        <div style="font-size:11px;font-weight:600;color:var(--pri);margin-bottom:6px">${c.label}</div>
+        <div style="font-size:1.45rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)}</div>
+        <div style="font-size:9.5px;color:#888;margin-top:6px;line-height:1.4">${c.nota || ''}</div>
+      </div>`).join('');
+  }
+
+  // Chart: faixas etárias
+  const faixasEl = document.getElementById('censo-ibge-chart-faixas');
+  if (faixasEl && faixas.length) {
+    const maxF = Math.max(...faixas.map(f => f.valor || 0));
+    S.charts.push(new Chart(faixasEl, {
+      type: 'bar',
+      data: {
+        labels: faixas.map(f => f.label),
+        datasets: [{
+          label: 'População',
+          data: faixas.map(f => f.valor),
+          backgroundColor: '#003866',
+          borderRadius: 3,
+          maxBarThickness: 28,
+        }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          datalabels: {
+            display: true, anchor: 'end', align: 'end',
+            font: { family: 'Inter', size: 9, weight: '600' }, color: '#444',
+            formatter: v => formatNumChart(v),
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: Math.ceil(maxF * 1.15),
+            ticks: { callback: v => formatNumChart(v), font: { family: 'Inter', size: 9 } },
+            grid: { color: 'rgba(0,0,0,.06)' },
+          },
+          y: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        },
+      },
+    }));
+  }
+
+  // Chart: sexo (donut — 2 categorias)
+  const sexoEl = document.getElementById('censo-ibge-chart-sexo');
+  if (sexoEl) {
+    S.charts.push(new Chart(sexoEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Masculino', 'Feminino'],
+        datasets: [{
+          data: [pop.masculino || 0, pop.feminino || 0],
+          backgroundColor: ['#003866', '#5B9BD5'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 }, usePointStyle: true } },
+          datalabels: {
+            display: true, color: '#fff',
+            font: { family: 'Inter', size: 11, weight: '700' },
+            formatter: (v, ctx) => {
+              const tot = (ctx.chart.data.datasets[0].data || []).reduce((a, b) => a + b, 0) || 1;
+              return ((v / tot) * 100).toFixed(1) + '%';
+            },
+          },
+        },
+      },
+    }));
+  }
+
+  // Chart: alfabetização donut
+  const alfEl = document.getElementById('censo-ibge-chart-alf');
+  if (alfEl) {
+    S.charts.push(new Chart(alfEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Alfabetizados', 'Não alfabetizados'],
+        datasets: [{
+          data: [alf['15_mais_alfabetizados'] || 0, alf['15_mais_nao_alfabetizados'] || 0],
+          backgroundColor: ['#2E7D32', '#EE302F'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 }, usePointStyle: true } },
+          datalabels: {
+            display: true, color: '#fff',
+            font: { family: 'Inter', size: 11, weight: '700' },
+            formatter: (v, ctx) => {
+              const tot = (ctx.chart.data.datasets[0].data || []).reduce((a, b) => a + b, 0) || 1;
+              return ((v / tot) * 100).toFixed(1) + '%';
+            },
+          },
+        },
+      },
+    }));
+  }
+
+  // Chart: alfabetização por faixa (stacked horizontal)
+  const alfFaixaEl = document.getElementById('censo-ibge-chart-alf-faixa');
+  if (alfFaixaEl && Array.isArray(alf.por_faixa)) {
+    const rows = alf.por_faixa.map(r => {
+      let alfa = r.alfabetizados || 0;
+      let nao = r.nao_alfabetizados;
+      if (nao == null && r.populacao != null) nao = Math.max(0, (r.populacao || 0) - alfa);
+      return { label: r.label, alfa, nao: nao || 0 };
+    }).filter(r => r.alfa > 0 || r.nao > 0);
+    const maxStack = Math.max(...rows.map(r => r.alfa + r.nao), 1);
+    S.charts.push(new Chart(alfFaixaEl, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.label),
+        datasets: [
+          { label: 'Alfabetizados', data: rows.map(r => r.alfa), backgroundColor: '#2E7D32', borderRadius: 2, maxBarThickness: 22 },
+          { label: 'Não alfabetizados', data: rows.map(r => r.nao), backgroundColor: '#EE302F', borderRadius: 2, maxBarThickness: 22 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: {
+            display: true, color: '#fff',
+            font: { family: 'Inter', size: 8, weight: '600' },
+            formatter: v => (v >= 500 ? formatNumChart(v) : ''),
+          },
+        },
+        scales: {
+          x: {
+            stacked: true, beginAtZero: true, max: Math.ceil(maxStack * 1.12),
+            ticks: { callback: v => formatNumChart(v), font: { family: 'Inter', size: 9 } },
+            grid: { color: 'rgba(0,0,0,.06)' },
+          },
+          y: { stacked: true, ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        },
+      },
+    }));
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // DISTORÇÃO IDADE-SÉRIE (TDI)
 // ══════════════════════════════════════════════════════════
 
@@ -10281,6 +10564,7 @@ function initNav() {
       document.body.classList.remove('sidebar-hidden');
 
       if (view === 'acesso' && S.data) { renderAcesso(); }
+      else if (view === 'censo-ibge') { renderCensoIbge(); }
       else if (view === 'fluxo') { renderFluxo(); }
       else if (view === 'infra' && S.infra) { renderInfra(); }
       else if (view === 'docencia' && S.doc) { renderDocencia(); }
@@ -11462,6 +11746,7 @@ function refreshActiveTab() {
   // Render directly (avoids .click() which can trigger initNav reset logic)
   if (view === 'home') renderHome();
   else if (view === 'acesso' && S.data) renderAcesso();
+  else if (view === 'censo-ibge') renderCensoIbge();
   else if (view === 'fluxo') renderFluxo();
   else if (view === 'infra' && S.infra) renderInfra();
   else if (view === 'docencia' && S.doc) renderDocencia();
@@ -14406,6 +14691,9 @@ const EXTR_ICON_CSV = '<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 const EXTR_ICON_JSON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
 const EXTRACAO_DATASETS = [
+  { id: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)',
+    desc: 'População por faixa etária, sexo e alfabetização (15+) — Censo Demográfico 2022.',
+    fonte: 'IBGE — Censo Demográfico 2022', file: 'dados/4_11_censo_ibge_municipal.json', state: 'censoIbge' },
   { id: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas',
     desc: 'Matrículas por etapa, perfil dos alunos (sexo/raça), integral, noturno e educação especial.',
     fonte: 'INEP — Censo Escolar', file: 'dados/4_1_acesso_matriculas.json', state: 'data' },
@@ -14627,7 +14915,7 @@ async function init() {
   try {
     const cb = '?_cb=' + Date.now();
     if (JV_MODE) {
-      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas] = await Promise.all([
+      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge] = await Promise.all([
         fetch('dados/4_1_acesso_matriculas.json' + cb),
         fetch(JV.geoFile + cb),
         fetch('dados/4_5_infraestrutura.json' + cb),
@@ -14641,6 +14929,7 @@ async function init() {
         fetch('dados/4_7_ideb.json' + cb),
         fetch('dados/4_10_tdi.json' + cb),
         fetch('dados/escolas_municipais.json' + cb),
+        fetch('dados/4_11_censo_ibge_municipal.json' + cb),
       ]);
       if (!respData.ok) throw new Error(`HTTP ${respData.status} — acesso`);
       S.data = await respData.json();
@@ -14656,6 +14945,7 @@ async function init() {
       if (respIdeb.ok) S.ideb = await respIdeb.json();
       if (respTdi.ok) S.tdi = await respTdi.json();
       if (respEscolas.ok) S.escolasData = await respEscolas.json();
+      if (respCensoIbge.ok) S.censoIbge = await respCensoIbge.json();
 
       S.redeCache.municipal = {
         acesso: S.data, infra: S.infra, fluxo: S.fluxo, saeb: S.saeb,
