@@ -45,6 +45,7 @@ const S = {
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
   redesData: null, // 4_1_redes.json — Visão por Redes (comparativo dependências)
+  conveniadasSed: null, // 4_1_conveniadas_sed.json — lista SED x Censo
   saersData: null,   // 4_saers.json — Avaliação SAERS
   saersEscolasData: null, // 4_saers_escolas.json — SAERS por escola estadual
   escolasData: null, // escolas_estaduais.json — Visão por Escola
@@ -601,8 +602,107 @@ function getRedeData(d, ano) {
   return d.serie_temporal[ano] || {};
 }
 
+/** Contagens de conveniadas (SED x Censo) disponiveis no ano — so municipal JV. */
+function getConveniadasCounts(d, ano) {
+  if (!(JV_MODE && S.redeSel === 'municipal' && d)) return { escolas: 0, mat: 0, infantil: 0 };
+  const su = d.serie_temporal?.[ano] || {};
+  const escolas = su.escolas_conveniadas ?? (ano === '2025' ? (d.metadata?.escolas_conveniadas || 0) : 0) || 0;
+  const mat = su.mat_conveniadas ?? (ano === '2025' ? (d.metadata?.mat_conveniadas || 0) : 0) || 0;
+  // Conveniadas atuais sao quase todas CEIs — infantil ~= mat total
+  const infantil = su.mat_infantil_conveniadas ?? mat;
+  return { escolas, mat, infantil };
+}
+
+/** KPIs da secao com rede direta + conveniadas (quando houver dado no ano). */
+function getAcessoKpiSu(d, ano) {
+  const su = { ...(getRedeData(d, ano) || {}) };
+  const conv = getConveniadasCounts(d, ano);
+  if (!conv.escolas && !conv.mat) return su;
+  const escBase = su.total_escolas ?? su.escolas ?? 0;
+  su.total_escolas = escBase + conv.escolas;
+  su.escolas = su.total_escolas;
+  su.mat_total = (su.mat_total || 0) + conv.mat;
+  su.mat_infantil = (su.mat_infantil || 0) + conv.infantil;
+  su._incluiConveniadas = true;
+  su._conv = conv;
+  return su;
+}
+
 function getRedeLabel() {
   return REDE_LABELS[S.redeSel] || 'Rede Estadual';
+}
+
+/** Modal com lista de escolas conveniadas (SED x Censo). */
+async function openConveniadasModal() {
+  let data = S.conveniadasSed;
+  if (!data) {
+    try {
+      const resp = await fetch('dados/4_1_conveniadas_sed.json?_cb=' + Date.now());
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      data = await resp.json();
+      S.conveniadasSed = data;
+    } catch (err) {
+      console.warn('conveniadas', err);
+      return;
+    }
+  }
+  const lista = data.conveniadas || [];
+  const meta = data.metadata || {};
+  const existing = document.getElementById('conv-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'conv-modal-overlay';
+  overlay.className = 'conv-modal-overlay';
+  overlay.innerHTML = `
+    <div class="conv-modal" role="dialog" aria-modal="true" aria-labelledby="conv-modal-title">
+      <div class="conv-modal-header">
+        <div>
+          <div class="conv-modal-title" id="conv-modal-title">Escolas Conveniadas</div>
+          <div class="conv-modal-sub">${lista.length} unidades · ${formatNum(meta.mat_conveniadas_censo_2025 || 0)} matrículas (Censo 2025) · quase todas CEIs</div>
+        </div>
+        <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="conv-modal-note">INEPs da base SED (sistema de matrículas) com Dependência Privada no Censo Escolar. Fazem parte do âmbito da rede municipal via convênio.</div>
+      <div class="conv-modal-search-wrap">
+        <input type="text" id="conv-modal-search" class="conv-modal-search" placeholder="Buscar por nome, INEP ou bairro...">
+      </div>
+      <div class="conv-modal-table-wrap">
+        <table class="data-table conv-modal-table">
+          <thead><tr>
+            <th>#</th><th>Escola</th><th>INEP</th><th>Bairro</th><th>Classe SED</th><th>Matrículas</th>
+          </tr></thead>
+          <tbody>
+            ${lista.map((e, i) => `
+              <tr data-q="${String(e.nome_sed || '').toLowerCase()} ${e.inep || ''} ${String(e.bairro || '').toLowerCase()}">
+                <td>${i + 1}</td>
+                <td><strong>${e.nome_sed || e.nome_censo || '—'}</strong></td>
+                <td>${e.inep || '—'}</td>
+                <td>${e.bairro || '—'}</td>
+                <td style="font-size:10px">${e.classe || e.prefixo || '—'}</td>
+                <td>${formatNum(e.mat_total_censo_2025 || 0)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="conv-modal-footer">Fonte: SED (Unidades escolares) × INEP Censo Escolar 2025</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.conv-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  const search = overlay.querySelector('#conv-modal-search');
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    overlay.querySelectorAll('tbody tr').forEach(tr => {
+      tr.style.display = (!q || tr.dataset.q.includes(q)) ? '' : 'none';
+    });
+  });
+  document.addEventListener('keydown', function onEsc(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  });
+  setTimeout(() => search.focus(), 50);
 }
 
 /** Arquivo de escolas por dependencia (mapa territorial Joinville). */
@@ -928,13 +1028,11 @@ function renderAcesso() {
     <div class="info-banner-rede-municipal" role="note">
       <div class="info-banner-rede-municipal-title">O que conta como Rede Municipal neste painel</div>
       <div class="info-banner-rede-municipal-body">
-        Os indicadores principais desta seção (matrículas, etapas, evolução) referem-se às escolas com
-        <strong>Dependência Municipal</strong> no Censo Escolar (INEP).
-        Além delas, a SED mantém convênios com escolas privadas — em geral <strong>CEIs</strong> —
-        que atendem alunos da rede e constam no sistema de matrículas municipal, mas aparecem como
-        <strong>Privada</strong> no Censo. Essas unidades são destacadas no card <em>Conveniadas</em>
-        (cruzamento SED × Censo 2025) e fazem parte do âmbito da rede, embora ainda não estejam
-        somadas aos KPIs principais.
+        Os KPIs desta seção (escolas, matrículas, educação infantil) somam
+        <strong>Dependência Municipal</strong> no Censo Escolar (INEP)
+        <strong>+ escolas conveniadas</strong> — unidades privadas no Censo que constam na base SED
+        de matrículas (em geral <strong>CEIs</strong>). Clique no card <em>Conveniadas</em> para ver a lista.
+        Gráficos de evolução histórica ainda refletem sobretudo a série da dependência municipal.
       </div>
     </div>` : '';
 
@@ -1155,7 +1253,7 @@ function renderAcesso() {
           <table class="data-table" id="mun-table">
             <thead><tr>
               ${JV_MODE
-                ? '<th>#</th><th>Escola</th><th>Total</th><th>Fund.</th><th>EJA</th>'
+                ? '<th>#</th><th>Escola</th><th>Total</th><th>Ens. Infantil</th><th>Anos Iniciais</th><th>Anos Finais</th><th>Médio</th><th>EJA</th>'
                 : '<th>#</th><th>Município</th><th>Esc.</th><th>Mat.</th><th>Fund.</th><th>Méd.</th><th>EJA</th><th>Téc.</th>'}
             </tr></thead>
             <tbody id="mun-tbody"></tbody>
@@ -1235,36 +1333,50 @@ function updateKPIs(ano, su, d) {
   const prev = idx > 0 ? anos[idx - 1] : null;
   const refLabel = prev ? `vs ${prev}` : '';
 
-  const suPrev = prev ? getRedeData(d, prev) : {};
+  // Em JV municipal: KPIs gerais = direta + conveniadas (quando houver dado no ano)
+  const kpiSu = getAcessoKpiSu(d, ano);
+  const suPrev = prev ? getAcessoKpiSu(d, prev) : {};
+  const conv = getConveniadasCounts(d, ano);
   const pctFn = (cur, old) => (cur != null && old != null && old !== 0) ? ((cur - old) / old * 100) : null;
   const absFn = (cur, old) => (cur != null && old != null) ? (cur - old) : null;
 
   const kpis = [
-    { label: 'Escolas', key: 'total_escolas', altKey: 'escolas', icon: 'img/icons/escola.png', accent: 'green' },
+    {
+      label: 'Escolas', key: 'total_escolas', altKey: 'escolas', icon: 'img/icons/escola.png', accent: 'green',
+      footerNote: conv.escolas
+        ? `${formatNum((kpiSu.total_escolas || 0) - conv.escolas)} diretas + ${formatNum(conv.escolas)} conv.`
+        : null,
+    },
     // Conveniadas: privadas no Censo, mas na base SED da rede municipal (quase todas CEIs)
     ...((JV_MODE && S.redeSel === 'municipal') ? [{
       label: 'Conveniadas',
       key: 'escolas_conveniadas',
       icon: 'img/icons/escola.png',
       accent: 'yellow',
-      tip: 'Escolas da base SED com Dependência Privada no Censo (convênio municipal). Em geral CEIs.',
-      footerNote: (d.metadata?.mat_conveniadas != null)
-        ? `${formatNum(d.metadata.mat_conveniadas)} matr. no Censo`
-        : 'SED × Censo 2025',
+      tip: 'Clique para ver a lista. Escolas da base SED com Dependência Privada no Censo (convênio municipal).',
+      footerNote: conv.mat ? `${formatNum(conv.mat)} matr. no Censo` : 'SED × Censo 2025',
       skipDelta: true,
+      clickable: true,
+      useRawSu: true, // valor vem da serie/metadata, nao do KPI ja somado
     }] : []),
-    { label: 'Matrículas', key: 'mat_total', icon: 'img/icons/matriculas.png', accent: 'green' },
-    ...(S.redeSel !== 'estadual' ? [{ label: 'Ed. Infantil', key: 'mat_infantil', icon: 'img/icons/infantil.png', accent: 'green' }] : []),
+    {
+      label: 'Matrículas', key: 'mat_total', icon: 'img/icons/matriculas.png', accent: 'green',
+      footerNote: conv.mat ? `inclui ${formatNum(conv.mat)} de conveniadas` : null,
+    },
+    ...(S.redeSel !== 'estadual' ? [{
+      label: 'Ed. Infantil', key: 'mat_infantil', icon: 'img/icons/infantil.png', accent: 'green',
+      footerNote: conv.infantil ? `inclui ${formatNum(conv.infantil)} de conveniadas` : null,
+    }] : []),
     { label: 'Fundamental', key: 'mat_fundamental', icon: 'img/icons/fundamental.png', accent: 'green' },
     ...(JV_MODE ? [] : [{ label: 'Ens. Médio', key: 'mat_medio', icon: 'img/icons/medio.png', accent: 'green' }]),
     { label: 'EJA', key: 'mat_eja', icon: 'img/icons/eja.png', accent: 'green' },
     ...(JV_MODE ? [] : [{ label: 'Técnico', key: 'mat_prof_tec', icon: 'img/icons/medio.png', accent: 'blue' }]),
   ];
 
-  // Build sparkline SVG from historical data
+  // Build sparkline SVG from historical data (com conveniadas quando existirem no ano)
   function buildSparkline(key, altKey, color) {
     const vals = anos.map(a => {
-      const rd = getRedeData(d, a);
+      const rd = getAcessoKpiSu(d, a);
       return rd[key] || rd[altKey] || 0;
     });
     if (vals.every(v => v === 0)) return '';
@@ -1284,10 +1396,14 @@ function updateKPIs(ano, su, d) {
   }
 
   const accentColors = { green: '#003866', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
+  const rawSu = su || getRedeData(d, ano);
 
   strip.innerHTML = kpis.map((k, i) => {
-    const val = su[k.key] ?? su[k.altKey] ?? d.metadata?.[k.key] ?? 0;
-    const prevVal = suPrev[k.key] || suPrev[k.altKey] || 0;
+    const src = k.useRawSu ? rawSu : kpiSu;
+    const val = k.useRawSu
+      ? (src[k.key] ?? d.metadata?.[k.key] ?? conv.escolas ?? 0)
+      : (src[k.key] ?? src[k.altKey] ?? 0);
+    const prevVal = k.useRawSu ? (suPrev._conv?.escolas || 0) : (suPrev[k.key] || suPrev[k.altKey] || 0);
     const delta = k.skipDelta ? null : pctFn(val, prevVal);
     const abs = k.skipDelta ? null : absFn(val, prevVal);
     const sparkSvg = k.skipDelta ? '' : buildSparkline(k.key, k.altKey || k.key, accentColors[k.accent]);
@@ -1302,9 +1418,10 @@ function updateKPIs(ano, su, d) {
           <span class="kpi-abs">${sign}${formatNum(abs)} ${refLabel}</span>
         ` : '<span class="kpi-abs">—</span>');
     return `
-    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${tip}">
+    <div class="kpi-card accent-${k.accent}${k.clickable ? ' kpi-card-clickable' : ''}" style="animation-delay:${i * 80}ms" title="${tip}"
+      ${k.clickable ? 'data-kpi-action="conveniadas"' : ''}>
       <div class="kpi-top">
-        <span class="kpi-label">${k.label}</span>
+        <span class="kpi-label">${k.label}${k.clickable ? ' ▸' : ''}</span>
         <img class="kpi-icon" src="${k.icon}" alt="${k.label}">
       </div>
       <div class="kpi-body">
@@ -1314,6 +1431,10 @@ function updateKPIs(ano, su, d) {
       <div class="kpi-footer">${footer}</div>
     </div>`;
   }).join('');
+
+  strip.querySelectorAll('[data-kpi-action="conveniadas"]').forEach(card => {
+    card.addEventListener('click', () => openConveniadasModal());
+  });
 
   // Count-up animation
   strip.querySelectorAll('.kpi-value[data-target]').forEach(el => {
@@ -11581,10 +11702,18 @@ function buildEscolaLayer(d, anoSel) {
         <hr style="margin:4px 0;border:none;border-top:1px solid #eee">
         <div style="font-size:10px;line-height:1.6">
           ${e.mat_total != null ? `<div><strong>Total Matrículas:</strong> ${formatNum(e.mat_total)}</div>` : ''}
-          ${e.mat_fund != null && e.mat_fund > 0 ? `<span style="display:inline-block;background:#0097A722;padding:1px 5px;border-radius:3px;margin:1px">Fund: <strong>${formatNum(e.mat_fund)}</strong></span>` : ''}
-          ${!JV_MODE && e.mat_medio != null && e.mat_medio > 0 ? `<span style="display:inline-block;background:#EE302F22;padding:1px 5px;border-radius:3px;margin:1px">Médio: <strong>${formatNum(e.mat_medio)}</strong></span>` : ''}
-          ${e.mat_eja != null && e.mat_eja > 0 ? `<span style="display:inline-block;background:#1565C022;padding:1px 5px;border-radius:3px;margin:1px">EJA: <strong>${formatNum(e.mat_eja)}</strong></span>` : ''}
-          ${!JV_MODE && e.mat_tecnico != null && e.mat_tecnico > 0 ? `<span style="display:inline-block;background:#6A1B9A22;padding:1px 5px;border-radius:3px;margin:1px">Técnico: <strong>${formatNum(e.mat_tecnico)}</strong></span>` : ''}
+          ${JV_MODE ? `
+            ${e.mat_infantil ? `<span style="display:inline-block;background:#00AB4E22;padding:1px 5px;border-radius:3px;margin:1px">Infantil: <strong>${formatNum(e.mat_infantil)}</strong></span>` : ''}
+            ${e.mat_fund_ai ? `<span style="display:inline-block;background:#0097A722;padding:1px 5px;border-radius:3px;margin:1px">AI: <strong>${formatNum(e.mat_fund_ai)}</strong></span>` : ''}
+            ${e.mat_fund_af ? `<span style="display:inline-block;background:#1565C022;padding:1px 5px;border-radius:3px;margin:1px">AF: <strong>${formatNum(e.mat_fund_af)}</strong></span>` : ''}
+            ${e.mat_medio ? `<span style="display:inline-block;background:#EE302F22;padding:1px 5px;border-radius:3px;margin:1px">Médio: <strong>${formatNum(e.mat_medio)}</strong></span>` : ''}
+            ${e.mat_eja ? `<span style="display:inline-block;background:#6A1B9A22;padding:1px 5px;border-radius:3px;margin:1px">EJA: <strong>${formatNum(e.mat_eja)}</strong></span>` : ''}
+          ` : `
+            ${e.mat_fund != null && e.mat_fund > 0 ? `<span style="display:inline-block;background:#0097A722;padding:1px 5px;border-radius:3px;margin:1px">Fund: <strong>${formatNum(e.mat_fund)}</strong></span>` : ''}
+            ${e.mat_medio != null && e.mat_medio > 0 ? `<span style="display:inline-block;background:#EE302F22;padding:1px 5px;border-radius:3px;margin:1px">Médio: <strong>${formatNum(e.mat_medio)}</strong></span>` : ''}
+            ${e.mat_eja != null && e.mat_eja > 0 ? `<span style="display:inline-block;background:#1565C022;padding:1px 5px;border-radius:3px;margin:1px">EJA: <strong>${formatNum(e.mat_eja)}</strong></span>` : ''}
+            ${e.mat_tecnico != null && e.mat_tecnico > 0 ? `<span style="display:inline-block;background:#6A1B9A22;padding:1px 5px;border-radius:3px;margin:1px">Técnico: <strong>${formatNum(e.mat_tecnico)}</strong></span>` : ''}
+          `}
         </div>
         ${(e.ideb_af != null || e.icg_nivel != null || e.tdi_fund != null) ? `
         <hr style="margin:4px 0;border:none;border-top:1px solid #eee">
@@ -11613,7 +11742,7 @@ function buildEscolaLayer(d, anoSel) {
 
   const thead = document.querySelector('#mun-table thead tr');
   if (thead) thead.innerHTML = JV_MODE
-    ? '<th>#</th><th>Escola</th><th>Total</th><th>Fund.</th><th>EJA</th>'
+    ? '<th>#</th><th>Escola</th><th>Total</th><th>Ens. Infantil</th><th>Anos Iniciais</th><th>Anos Finais</th><th>Médio</th><th>EJA</th>'
     : '<th>#</th><th>Escola</th><th>Município</th><th>Total</th><th>Fund.</th><th>Médio</th><th>EJA</th><th>Técnico</th>';
 
   const sorted = [...filtered].sort((a, b) => (b.mat_total || 0) - (a.mat_total || 0));
@@ -11623,7 +11752,10 @@ function buildEscolaLayer(d, anoSel) {
       <td>${i + 1}</td>
       <td><strong style="font-size:10px">${e.nome}</strong></td>
       <td>${formatNum(e.mat_total || 0)}</td>
-      <td>${formatNum(e.mat_fund || 0)}</td>
+      <td>${formatNum(e.mat_infantil || 0)}</td>
+      <td>${formatNum(e.mat_fund_ai || 0)}</td>
+      <td>${formatNum(e.mat_fund_af || 0)}</td>
+      <td>${formatNum(e.mat_medio || 0)}</td>
       <td>${formatNum(e.mat_eja || 0)}</td>
     </tr>
   ` : `
