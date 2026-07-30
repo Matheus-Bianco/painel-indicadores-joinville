@@ -46,6 +46,8 @@ const S = {
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
   redesData: null, // 4_1_redes.json — Visão por Redes (comparativo dependências)
   conveniadasSed: null, // 4_1_conveniadas_sed.json — lista SED x Censo
+  conveniadasSerie: null, // 4_1_conveniadas_serie.json — série histórica p/ merge no Acesso
+  _acessoMunicipalBase: null, // acesso municipal SEM conveniadas (base do merge)
   saersData: null,   // 4_saers.json — Avaliação SAERS
   saersEscolasData: null, // 4_saers_escolas.json — SAERS por escola estadual
   escolasData: null, // escolas_estaduais.json — Visão por Escola
@@ -605,20 +607,125 @@ function getRedeData(d, ano) {
 /** Contagens de conveniadas (SED x Censo) disponiveis no ano — so municipal JV. */
 function getConveniadasCounts(d, ano) {
   if (!(JV_MODE && S.redeSel === 'municipal' && d)) return { escolas: 0, mat: 0, infantil: 0 };
+  // Preferir série dedicada (histórico completo)
+  const cs = S.conveniadasSerie?.serie_temporal?.[ano];
+  if (cs) {
+    return {
+      escolas: cs.total_escolas || 0,
+      mat: cs.mat_total || 0,
+      infantil: cs.mat_infantil || 0,
+    };
+  }
   const su = d.serie_temporal?.[ano] || {};
   const fallbackEsc = ano === '2025' ? (d.metadata?.escolas_conveniadas || 0) : 0;
   const fallbackMat = ano === '2025' ? (d.metadata?.mat_conveniadas || 0) : 0;
   const escolas = (su.escolas_conveniadas != null ? su.escolas_conveniadas : fallbackEsc) || 0;
   const mat = (su.mat_conveniadas != null ? su.mat_conveniadas : fallbackMat) || 0;
-  // Conveniadas atuais sao quase todas CEIs — infantil ~= mat total
   const infantil = (su.mat_infantil_conveniadas != null ? su.mat_infantil_conveniadas : mat) || 0;
   return { escolas, mat, infantil };
 }
 
-/** KPIs da secao com rede direta + conveniadas (quando houver dado no ano). */
+/** Soma campos numericos de dois objetos ( Ignora chaves de metadado de conveniadas ). */
+function _sumNumericFields(a, b, skipKeys) {
+  const skip = skipKeys || new Set();
+  const out = { ...(a || {}) };
+  for (const [k, v] of Object.entries(b || {})) {
+    if (skip.has(k)) continue;
+    if (typeof v === 'number' && !Number.isNaN(v)) {
+      out[k] = (typeof out[k] === 'number' ? out[k] : 0) + v;
+    }
+  }
+  return out;
+}
+
+/**
+ * Monta dataset de Acesso municipal ampliado = Dependencia Municipal + conveniadas SED.
+ * Usado em TODAS as visualizacoes da secao (KPIs, graficos, perfil, integral).
+ */
+function buildAcessoMunicipalAmpliado(base, convSerie) {
+  if (!base || !convSerie) return base;
+  const out = JSON.parse(JSON.stringify(base));
+  const skip = new Set(['escolas_conveniadas', 'mat_conveniadas', 'mat_infantil_conveniadas']);
+
+  for (const ano of Object.keys(out.serie_temporal || {})) {
+    const c = convSerie.serie_temporal?.[ano];
+    if (!c) continue;
+    const merged = _sumNumericFields(out.serie_temporal[ano], c, skip);
+    merged.escolas_conveniadas = c.total_escolas || 0;
+    merged.mat_conveniadas = c.mat_total || 0;
+    merged.mat_infantil_conveniadas = c.mat_infantil || 0;
+    out.serie_temporal[ano] = merged;
+  }
+
+  for (const ano of Object.keys(out.perfil_alunos || {})) {
+    const c = convSerie.perfil_alunos?.[ano];
+    if (!c) continue;
+    const p = out.perfil_alunos[ano] || (out.perfil_alunos[ano] = {});
+    for (const grp of ['sexo', 'raca']) {
+      if (!c[grp]) continue;
+      p[grp] = _sumNumericFields(p[grp] || {}, c[grp]);
+    }
+  }
+
+  out.integral = out.integral || {};
+  for (const ano of Object.keys(convSerie.integral || {})) {
+    out.integral[ano] = _sumNumericFields(out.integral[ano] || {}, convSerie.integral[ano]);
+  }
+
+  const c2025 = convSerie.serie_temporal?.['2025'] || {};
+  out.metadata = out.metadata || {};
+  out.metadata.inclui_conveniadas_sed = true;
+  out.metadata.escolas_conveniadas = c2025.total_escolas ?? out.metadata.escolas_conveniadas ?? 0;
+  out.metadata.mat_conveniadas = c2025.mat_total ?? out.metadata.mat_conveniadas ?? 0;
+  out.metadata.nota_conveniadas = (
+    'Todas as visualizacoes desta secao (KPIs e graficos) = Dependencia Municipal no Censo '
+    + '+ escolas conveniadas da base SED (privadas no Censo, em geral CEIs).'
+  );
+  return out;
+}
+
+async function loadConveniadasSerie() {
+  if (S.conveniadasSerie) return S.conveniadasSerie;
+  try {
+    const resp = await fetch('dados/4_1_conveniadas_serie.json?_cb=' + Date.now());
+    if (!resp.ok) return null;
+    S.conveniadasSerie = await resp.json();
+    return S.conveniadasSerie;
+  } catch (e) {
+    console.warn('conveniadas_serie', e);
+    return null;
+  }
+}
+
+/** Aplica merge municipal+conveniadas em S.data (Acesso). Nunca soma duas vezes. */
+async function ensureAcessoMunicipalAmpliado() {
+  if (!(JV_MODE && S.redeSel === 'municipal')) return;
+  const serie = await loadConveniadasSerie();
+  if (!serie) return;
+  let raw = S.redeCache.municipal?.acessoBase || S._acessoMunicipalBase;
+  if (!raw) {
+    if (!S.data || S.data.metadata?.inclui_conveniadas_sed) return;
+    raw = JSON.parse(JSON.stringify(S.data));
+    S._acessoMunicipalBase = raw;
+  }
+  S.data = buildAcessoMunicipalAmpliado(raw, serie);
+  if (!S.redeCache.municipal) S.redeCache.municipal = {};
+  S.redeCache.municipal.acessoBase = raw;
+  S.redeCache.municipal.acesso = S.data;
+}
+
+/**
+ * KPIs da secao. Se o dataset ja inclui conveniadas (merge), nao soma de novo.
+ */
 function getAcessoKpiSu(d, ano) {
   const su = { ...(getRedeData(d, ano) || {}) };
   const conv = getConveniadasCounts(d, ano);
+  su._conv = conv;
+  if (d?.metadata?.inclui_conveniadas_sed) {
+    su._incluiConveniadas = true;
+    return su;
+  }
+  // Fallback legado: soma so nos totais principais
   if (!conv.escolas && !conv.mat) return su;
   const escBase = su.total_escolas ?? su.escolas ?? 0;
   su.total_escolas = escBase + conv.escolas;
@@ -626,7 +733,6 @@ function getAcessoKpiSu(d, ano) {
   su.mat_total = (su.mat_total || 0) + conv.mat;
   su.mat_infantil = (su.mat_infantil || 0) + conv.infantil;
   su._incluiConveniadas = true;
-  su._conv = conv;
   return su;
 }
 
@@ -824,6 +930,14 @@ async function switchRede(rede) {
     }
     S.redeSel = rede;
     S.data = cached.acesso;
+    if (JV_MODE && rede === 'municipal') {
+      // Preserva base sem conveniadas e amplia KPIs + graficos
+      if (!cached.acessoBase && !cached.acesso?.metadata?.inclui_conveniadas_sed) {
+        cached.acessoBase = JSON.parse(JSON.stringify(cached.acesso));
+        S._acessoMunicipalBase = cached.acessoBase;
+      }
+      await ensureAcessoMunicipalAmpliado();
+    }
     // Re-populate year dropdown for this rede
     const anos = Object.keys(S.data.serie_temporal).sort();
     const selAno = document.getElementById('sel-ano');
@@ -1069,11 +1183,11 @@ function renderAcesso() {
     <div class="info-banner-rede-municipal" role="note">
       <div class="info-banner-rede-municipal-title">O que conta como Rede Municipal neste painel</div>
       <div class="info-banner-rede-municipal-body">
-        Os KPIs desta seção (escolas, matrículas, educação infantil) somam
+        <strong>Todas as visualizações</strong> desta seção (KPIs e gráficos) somam
         <strong>Dependência Municipal</strong> no Censo Escolar (INEP)
         <strong>+ escolas conveniadas</strong> — unidades privadas no Censo que constam na base SED
-        de matrículas (em geral <strong>CEIs</strong>). Clique no card <em>Conveniadas</em> para ver a lista.
-        Gráficos de evolução histórica ainda refletem sobretudo a série da dependência municipal.
+        (em geral <strong>CEIs</strong>). A série histórica aplica os mesmos INEPs da lista SED em cada ano do Censo.
+        Clique no card <em>Conveniadas</em> para ver a lista atual.
       </div>
     </div>` : '';
 
@@ -15194,7 +15308,7 @@ async function init() {
   try {
     const cb = '?_cb=' + Date.now();
     if (JV_MODE) {
-      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv] = await Promise.all([
+      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv, respConvSerie] = await Promise.all([
         fetch('dados/4_1_acesso_matriculas.json' + cb),
         fetch(JV.geoFile + cb),
         fetch('dados/4_5_infraestrutura.json' + cb),
@@ -15210,9 +15324,14 @@ async function init() {
         fetch('dados/escolas_municipais.json' + cb),
         fetch('dados/4_11_censo_ibge_municipal.json' + cb),
         fetch('dados/escolas_conveniadas.json' + cb),
+        fetch('dados/4_1_conveniadas_serie.json' + cb),
       ]);
       if (!respData.ok) throw new Error(`HTTP ${respData.status} — acesso`);
       S.data = await respData.json();
+      S._acessoMunicipalBase = JSON.parse(JSON.stringify(S.data));
+      if (respConvSerie.ok) {
+        try { S.conveniadasSerie = await respConvSerie.json(); } catch (e) { console.warn('conveniadas_serie', e); }
+      }
       if (respGeo.ok) { S.geo = await respGeo.json(); normalizeJoinvilleGeo(S.geo); }
       if (respInfra.ok) S.infra = await respInfra.json();
       if (respDoc.ok) S.doc = await respDoc.json();
@@ -15231,12 +15350,15 @@ async function init() {
         S.escolasData = mergeMunicipalEscolasWithConveniadas(S.escolasData, S._escolasConveniadas);
       }
 
+      S.redeSel = 'municipal';
       S.redeCache.municipal = {
+        acessoBase: S._acessoMunicipalBase,
         acesso: S.data, infra: S.infra, fluxo: S.fluxo, saeb: S.saeb,
         inse: S.inse, icg: S.icg, afd: S.afd, ideb: S.ideb, tdi: S.tdi,
         saers: null, saersEscolas: null, docentes: S.doc,
         escolas: S.escolasData,
       };
+      await ensureAcessoMunicipalAmpliado();
     } else {
       const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respCreGeo, respCreLookup, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respSaers, respSaersEsc, respDesig] = await Promise.all([
         fetch('dados/4_1_acesso_estadual.json'),
