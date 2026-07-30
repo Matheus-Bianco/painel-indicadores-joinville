@@ -690,6 +690,30 @@ body.sidebar-hidden .main-scroll #main-content {
   margin-bottom: 10px;
 }
 
+/* Aviso Rede Municipal + Conveniadas (Acesso) */
+.info-banner-rede-municipal {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(21,101,192,.06) 0%, rgba(255,203,4,.08) 100%);
+  border: 1px solid rgba(13,59,102,.14);
+  border-left: 4px solid #1565C0;
+  border-radius: 10px;
+}
+.info-banner-rede-municipal-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pri, #0D47A1);
+  margin-bottom: 4px;
+  letter-spacing: .2px;
+}
+.info-banner-rede-municipal-body {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #3d4f63;
+}
+.info-banner-rede-municipal-body strong { color: #1a2332; }
+.info-banner-rede-municipal-body em { font-style: normal; font-weight: 700; color: #8a6d00; }
+
 .kpi-card {
   background: linear-gradient(135deg, #ffffff 0%, #f6f9fc 100%);
   border-radius: 10px;

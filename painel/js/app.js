@@ -924,12 +924,28 @@ function renderAcesso() {
   destroyCharts();
   destroyMap();
 
+  const avisoRedeMunicipal = (JV_MODE && S.redeSel === 'municipal') ? `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">O que conta como Rede Municipal neste painel</div>
+      <div class="info-banner-rede-municipal-body">
+        Os indicadores principais desta seção (matrículas, etapas, evolução) referem-se às escolas com
+        <strong>Dependência Municipal</strong> no Censo Escolar (INEP).
+        Além delas, a SED mantém convênios com escolas privadas — em geral <strong>CEIs</strong> —
+        que atendem alunos da rede e constam no sistema de matrículas municipal, mas aparecem como
+        <strong>Privada</strong> no Censo. Essas unidades são destacadas no card <em>Conveniadas</em>
+        (cruzamento SED × Censo 2025) e fazem parte do âmbito da rede, embora ainda não estejam
+        somadas aos KPIs principais.
+      </div>
+    </div>` : '';
+
   main.innerHTML = `
     <div class="section-sticky">
       ${sectionBanner('img/icons/nav_acesso.png', 'Acesso e Matrículas', sectionSubtitle())}
       ${redeToggleHTML()}
       <div class="kpi-strip" id="kpi-strip"></div>
     </div>
+
+    ${avisoRedeMunicipal}
 
     <!-- ═══ EIXO: Panorama da Rede ═══ -->
     <div class="section-divider">
@@ -1225,6 +1241,18 @@ function updateKPIs(ano, su, d) {
 
   const kpis = [
     { label: 'Escolas', key: 'total_escolas', altKey: 'escolas', icon: 'img/icons/escola.png', accent: 'green' },
+    // Conveniadas: privadas no Censo, mas na base SED da rede municipal (quase todas CEIs)
+    ...((JV_MODE && S.redeSel === 'municipal') ? [{
+      label: 'Conveniadas',
+      key: 'escolas_conveniadas',
+      icon: 'img/icons/escola.png',
+      accent: 'yellow',
+      tip: 'Escolas da base SED com Dependência Privada no Censo (convênio municipal). Em geral CEIs.',
+      footerNote: (d.metadata?.mat_conveniadas != null)
+        ? `${formatNum(d.metadata.mat_conveniadas)} matr. no Censo`
+        : 'SED × Censo 2025',
+      skipDelta: true,
+    }] : []),
     { label: 'Matrículas', key: 'mat_total', icon: 'img/icons/matriculas.png', accent: 'green' },
     ...(S.redeSel !== 'estadual' ? [{ label: 'Ed. Infantil', key: 'mat_infantil', icon: 'img/icons/infantil.png', accent: 'green' }] : []),
     { label: 'Fundamental', key: 'mat_fundamental', icon: 'img/icons/fundamental.png', accent: 'green' },
@@ -1258,14 +1286,23 @@ function updateKPIs(ano, su, d) {
   const accentColors = { green: '#003866', yellow: '#FFCB04', red: '#EE302F', blue: '#1565C0' };
 
   strip.innerHTML = kpis.map((k, i) => {
-    const val = su[k.key] || su[k.altKey] || 0;
+    const val = su[k.key] ?? su[k.altKey] ?? d.metadata?.[k.key] ?? 0;
     const prevVal = suPrev[k.key] || suPrev[k.altKey] || 0;
-    const delta = pctFn(val, prevVal);
-    const abs = absFn(val, prevVal);
-    const sparkSvg = buildSparkline(k.key, k.altKey || k.key, accentColors[k.accent]);
+    const delta = k.skipDelta ? null : pctFn(val, prevVal);
+    const abs = k.skipDelta ? null : absFn(val, prevVal);
+    const sparkSvg = k.skipDelta ? '' : buildSparkline(k.key, k.altKey || k.key, accentColors[k.accent]);
     const sign = abs > 0 ? '+' : '';
+    const tip = k.tip || `${k.label}: ${formatNum(val)} (${anos[0]}–${ano})`;
+    const footer = k.footerNote
+      ? `<span class="kpi-abs">${k.footerNote}</span>`
+      : (delta != null ? `
+          <span class="kpi-delta ${deltaClass(delta)}">
+            ${deltaArrow(delta)} ${formatPct(delta)}
+          </span>
+          <span class="kpi-abs">${sign}${formatNum(abs)} ${refLabel}</span>
+        ` : '<span class="kpi-abs">—</span>');
     return `
-    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${k.label}: ${formatNum(val)} (${anos[0]}–${ano})">
+    <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 80}ms" title="${tip}">
       <div class="kpi-top">
         <span class="kpi-label">${k.label}</span>
         <img class="kpi-icon" src="${k.icon}" alt="${k.label}">
@@ -1274,14 +1311,7 @@ function updateKPIs(ano, su, d) {
         <span class="kpi-value" data-target="${val}">${formatNum(val)}</span>
         ${sparkSvg}
       </div>
-      <div class="kpi-footer">
-        ${delta != null ? `
-          <span class="kpi-delta ${deltaClass(delta)}">
-            ${deltaArrow(delta)} ${formatPct(delta)}
-          </span>
-          <span class="kpi-abs">${sign}${formatNum(abs)} ${refLabel}</span>
-        ` : '<span class="kpi-abs">—</span>'}
-      </div>
+      <div class="kpi-footer">${footer}</div>
     </div>`;
   }).join('');
 
