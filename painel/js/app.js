@@ -606,10 +606,12 @@ function getRedeData(d, ano) {
 function getConveniadasCounts(d, ano) {
   if (!(JV_MODE && S.redeSel === 'municipal' && d)) return { escolas: 0, mat: 0, infantil: 0 };
   const su = d.serie_temporal?.[ano] || {};
-  const escolas = su.escolas_conveniadas ?? (ano === '2025' ? (d.metadata?.escolas_conveniadas || 0) : 0) || 0;
-  const mat = su.mat_conveniadas ?? (ano === '2025' ? (d.metadata?.mat_conveniadas || 0) : 0) || 0;
+  const fallbackEsc = ano === '2025' ? (d.metadata?.escolas_conveniadas || 0) : 0;
+  const fallbackMat = ano === '2025' ? (d.metadata?.mat_conveniadas || 0) : 0;
+  const escolas = (su.escolas_conveniadas != null ? su.escolas_conveniadas : fallbackEsc) || 0;
+  const mat = (su.mat_conveniadas != null ? su.mat_conveniadas : fallbackMat) || 0;
   // Conveniadas atuais sao quase todas CEIs — infantil ~= mat total
-  const infantil = su.mat_infantil_conveniadas ?? mat;
+  const infantil = (su.mat_infantil_conveniadas != null ? su.mat_infantil_conveniadas : mat) || 0;
   return { escolas, mat, infantil };
 }
 
