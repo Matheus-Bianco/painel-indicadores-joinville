@@ -714,6 +714,22 @@ body.sidebar-hidden .main-scroll #main-content {
 .info-banner-rede-municipal-body strong { color: #1a2332; }
 .info-banner-rede-municipal-body em { font-style: normal; font-weight: 700; color: #8a6d00; }
 
+.tag-conveniada {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: #7a5b00;
+  background: rgba(255, 203, 4, .28);
+  border: 1px solid rgba(249, 168, 37, .45);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .kpi-card-clickable {
   cursor: pointer;
 }

@@ -712,6 +712,41 @@ function escolasFileForRede(rede) {
   return `dados/escolas_${rede}.json`;
 }
 
+/** Mescla escolas municipais diretas + conveniadas SED (para tabela/mapa). */
+function mergeMunicipalEscolasWithConveniadas(escolasData, convData) {
+  const base = escolasData || { escolas: [], metadata: {} };
+  const diretas = (base.escolas || []).map(e => ({
+    ...e,
+    tipo_rede: e.tipo_rede === 'conveniada' ? 'conveniada' : (e.tipo_rede || 'direta'),
+  }));
+  const seen = new Set(diretas.map(e => String(e.inep)));
+  const conv = (convData?.escolas || []).filter(e => e?.inep && !seen.has(String(e.inep)));
+  return {
+    ...base,
+    metadata: {
+      ...(base.metadata || {}),
+      escolas_diretas: diretas.filter(e => e.tipo_rede !== 'conveniada').length,
+      escolas_conveniadas: conv.length + diretas.filter(e => e.tipo_rede === 'conveniada').length,
+      total_escolas: diretas.length + conv.length,
+      inclui_conveniadas_sed: true,
+    },
+    escolas: [...diretas, ...conv.map(e => ({ ...e, tipo_rede: 'conveniada' }))],
+  };
+}
+
+async function loadEscolasConveniadas() {
+  if (S._escolasConveniadas) return S._escolasConveniadas;
+  try {
+    const resp = await fetch('dados/escolas_conveniadas.json?_cb=' + Date.now());
+    if (!resp.ok) return null;
+    S._escolasConveniadas = await resp.json();
+    return S._escolasConveniadas;
+  } catch (e) {
+    console.warn('escolas_conveniadas', e);
+    return null;
+  }
+}
+
 /** Lazy-load JSON data for a given rede. Returns cached if already loaded. */
 async function loadRedeData(rede) {
   // Em Joinville, exige também escolas da dependencia (mapa territorial)
@@ -802,6 +837,10 @@ async function switchRede(rede) {
       if (cached.docentes) S.doc = cached.docentes;
       // Mapa/tabela territorial: trocar escolas da dependencia selecionada
       S.escolasData = cached.escolas || { escolas: [], metadata: { rede, total_escolas: 0 } };
+      if (rede === 'municipal') {
+        const convEsc = await loadEscolasConveniadas();
+        if (convEsc) S.escolasData = mergeMunicipalEscolasWithConveniadas(S.escolasData, convEsc);
+      }
       S.mapMode = 'esc';
       try { destroyMap(); } catch (e) { console.warn('destroyMap', e); S.map = null; S.mapLayer = null; }
     } else {
@@ -1409,14 +1448,18 @@ function updateKPIs(ano, su, d) {
     const sparkSvg = k.skipDelta ? '' : buildSparkline(k.key, k.altKey || k.key, accentColors[k.accent]);
     const sign = abs > 0 ? '+' : '';
     const tip = k.tip || `${k.label}: ${formatNum(val)} (${anos[0]}–${ano})`;
-    const footer = k.footerNote
-      ? `<span class="kpi-abs">${k.footerNote}</span>`
-      : (delta != null ? `
+    let footer;
+    if (k.skipDelta && k.footerNote) {
+      footer = `<span class="kpi-abs">${k.footerNote}</span>`;
+    } else if (delta != null) {
+      footer = `
           <span class="kpi-delta ${deltaClass(delta)}">
             ${deltaArrow(delta)} ${formatPct(delta)}
           </span>
-          <span class="kpi-abs">${sign}${formatNum(abs)} ${refLabel}</span>
-        ` : '<span class="kpi-abs">—</span>');
+          <span class="kpi-abs">${k.footerNote || `${sign}${formatNum(abs)} ${refLabel}`}</span>`;
+    } else {
+      footer = `<span class="kpi-abs">${k.footerNote || '—'}</span>`;
+    }
     return `
     <div class="kpi-card accent-${k.accent}${k.clickable ? ' kpi-card-clickable' : ''}" style="animation-delay:${i * 80}ms" title="${tip}"
       ${k.clickable ? 'data-kpi-action="conveniadas"' : ''}>
@@ -11692,12 +11735,16 @@ function buildEscolaLayer(d, anoSel) {
   addJoinvilleContour(markers);
   // Add CircleMarkers
   withCoords.forEach(e => {
+    const isConv = e.tipo_rede === 'conveniada';
     const marker = L.circleMarker([e.lat, e.lng], {
-      radius: 4, fillColor: COLORS.pri, color: '#fff', weight: 1, fillOpacity: 0.8,
+      radius: isConv ? 5 : 4,
+      fillColor: isConv ? '#F9A825' : COLORS.pri,
+      color: '#fff', weight: 1, fillOpacity: 0.85,
     });
     marker.bindPopup(`
       <div style="font-family:Inter;min-width:220px">
-        <strong style="font-size:12px">${e.nome}</strong><br>
+        <strong style="font-size:12px">${e.nome}</strong>
+        ${isConv ? ' <span class="tag-conveniada">Conveniada</span>' : ''}<br>
         <span style="font-size:10px;color:#666">${e.municipio || lookup[e.cod_mun] || ''} — INEP: ${e.inep || ''}</span>
         <hr style="margin:4px 0;border:none;border-top:1px solid #eee">
         <div style="font-size:10px;line-height:1.6">
@@ -11738,7 +11785,12 @@ function buildEscolaLayer(d, anoSel) {
 
   // Build escola table
   const titleEl = document.querySelector('#mun-table-wrapper .table-header h3');
-  if (titleEl) titleEl.textContent = 'Tabela de Escolas';
+  if (titleEl) {
+    const nConv = filtered.filter(e => e.tipo_rede === 'conveniada').length;
+    titleEl.textContent = (JV_MODE && nConv)
+      ? `Tabela de Escolas (${filtered.length} · ${nConv} conveniadas)`
+      : 'Tabela de Escolas';
+  }
 
   const thead = document.querySelector('#mun-table thead tr');
   if (thead) thead.innerHTML = JV_MODE
@@ -11748,9 +11800,12 @@ function buildEscolaLayer(d, anoSel) {
   const sorted = [...filtered].sort((a, b) => (b.mat_total || 0) - (a.mat_total || 0));
   const tbody = document.getElementById('mun-tbody');
   tbody.innerHTML = sorted.map((e, i) => JV_MODE ? `
-    <tr data-lat="${e.lat || ''}" data-lng="${e.lng || ''}" data-inep="${e.inep || ''}" data-cod-mun="${e.cod_mun || ''}" style="cursor:pointer">
+    <tr data-lat="${e.lat || ''}" data-lng="${e.lng || ''}" data-inep="${e.inep || ''}" data-cod-mun="${e.cod_mun || ''}" data-tipo="${e.tipo_rede || ''}" style="cursor:pointer${e.tipo_rede === 'conveniada' ? ';background:rgba(255,203,4,.06)' : ''}">
       <td>${i + 1}</td>
-      <td><strong style="font-size:10px">${e.nome}</strong></td>
+      <td>
+        <strong style="font-size:10px">${e.nome}</strong>
+        ${e.tipo_rede === 'conveniada' ? '<span class="tag-conveniada">Conveniada</span>' : ''}
+      </td>
       <td>${formatNum(e.mat_total || 0)}</td>
       <td>${formatNum(e.mat_infantil || 0)}</td>
       <td>${formatNum(e.mat_fund_ai || 0)}</td>
@@ -15137,7 +15192,7 @@ async function init() {
   try {
     const cb = '?_cb=' + Date.now();
     if (JV_MODE) {
-      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge] = await Promise.all([
+      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv] = await Promise.all([
         fetch('dados/4_1_acesso_matriculas.json' + cb),
         fetch(JV.geoFile + cb),
         fetch('dados/4_5_infraestrutura.json' + cb),
@@ -15152,6 +15207,7 @@ async function init() {
         fetch('dados/4_10_tdi.json' + cb),
         fetch('dados/escolas_municipais.json' + cb),
         fetch('dados/4_11_censo_ibge_municipal.json' + cb),
+        fetch('dados/escolas_conveniadas.json' + cb),
       ]);
       if (!respData.ok) throw new Error(`HTTP ${respData.status} — acesso`);
       S.data = await respData.json();
@@ -15168,6 +15224,10 @@ async function init() {
       if (respTdi.ok) S.tdi = await respTdi.json();
       if (respEscolas.ok) S.escolasData = await respEscolas.json();
       if (respCensoIbge.ok) S.censoIbge = await respCensoIbge.json();
+      if (respEscConv.ok) {
+        S._escolasConveniadas = await respEscConv.json();
+        S.escolasData = mergeMunicipalEscolasWithConveniadas(S.escolasData, S._escolasConveniadas);
+      }
 
       S.redeCache.municipal = {
         acesso: S.data, infra: S.infra, fluxo: S.fluxo, saeb: S.saeb,
