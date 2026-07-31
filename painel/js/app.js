@@ -3451,8 +3451,7 @@ function avisoEscolasDiretasMunicipalHTML() {
         — cerca de <strong>${formatNum(nDir)} unidades diretas</strong>.
         <strong>Não incluem</strong> as cerca de <strong>${formatNum(nConv)} escolas conveniadas</strong>
         (privadas no Censo e presentes na base SED), que em Acesso e Matrículas entram no recorte ampliado da rede.
-        Caso seja necessário incorporar dados de docentes ou formação das conveniadas,
-        entre em contato com a equipe técnica da SED / Painel para solicitar o levantamento.
+        Caso seja necessário incorporar dados de docentes ou formação das conveniadas, solicite o levantamento.
       </div>
     </div>`;
 }
