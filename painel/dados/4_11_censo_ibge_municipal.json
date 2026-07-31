@@ -1,16 +1,17 @@
 {
   "metadata": {
-    "fonte": "IBGE - Censo Demografico 2022 (Agregados por Municipios)",
+    "fonte": "IBGE - Censo Demografico 2022",
     "arquivos": [
       "Agregados_por_municipios_demografia_BR.xlsx",
-      "Agregados_por_municipios_alfabetizacao_BR.xlsx"
+      "Agregados_por_municipios_alfabetizacao_BR.xlsx",
+      "tabela9514.xlsx"
     ],
     "municipio": "Joinville",
     "uf": "SC",
     "co_municipio": "4209102",
     "ano_referencia": 2022,
-    "nota_faixas": "As faixas etarias do Censo 2022 (0-4, 5-9, 10-14, 15-19, 20-24) nao coincidem com as faixas tipicas do PME (0-3, 4-5, 6-14, 15-17, 18-24). Nao ha estimativas anuais 2023/2024 nesta base. Nivel de escolaridade (instrucao) nao esta disponivel nestes arquivos - apenas alfabetizacao.",
-    "gerado_em": "2026-07-16T07:02:13.834084"
+    "nota_faixas": "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 (idade simples, Resultados do Universo). Grupos quinquenais vêm dos Agregados por Municipios. Totais podem diferir ligeiramente entre as duas fontes.",
+    "gerado_em": "2026-07-31T10:00:07.129923"
   },
   "populacao": {
     "total": 614054,
@@ -73,21 +74,58 @@
         "valor": 34716
       }
     ],
+    "faixas_pme": {
+      "fonte": "IBGE SIDRA Tabela 9514 — Censo Demografico 2022 (idade simples, Universo)",
+      "total_referencia": 616317,
+      "nota": "Faixas montadas por soma de idades simples (SIDRA 9514). O total da 9514 pode diferir ligeiramente dos Agregados por Municipios (revisoes do Universo). Percentuais usam o total da 9514.",
+      "faixas": [
+        {
+          "key": "0_3",
+          "label": "0 a 3 anos",
+          "valor": 28956,
+          "pct": 4.7
+        },
+        {
+          "key": "6_14",
+          "label": "6 a 14 anos",
+          "valor": 70881,
+          "pct": 11.5
+        },
+        {
+          "key": "15_17",
+          "label": "15 a 17 anos",
+          "valor": 23278,
+          "pct": 3.8
+        },
+        {
+          "key": "18_24",
+          "label": "18 a 24 anos",
+          "valor": 65501,
+          "pct": 10.6
+        },
+        {
+          "key": "25_mais",
+          "label": "25 anos ou mais",
+          "valor": 412068,
+          "pct": 66.9
+        }
+      ]
+    },
     "aproximacoes_pme": {
       "5_14": {
         "label": "5 a 14 anos (aprox. PME 6-14)",
         "valor": 78596,
-        "nota": "Soma das faixas 5-9 e 10-14 do Censo 2022. O PME pede 6-14."
+        "nota": "Aproximacao por grupos quinquenais. Preferir faixa 6-14 da SIDRA 9514."
       },
       "15_24": {
-        "label": "15 a 24 anos (aprox. PME 15-17 + 18-24)",
+        "label": "15 a 24 anos (aprox.)",
         "valor": 88381,
-        "nota": "Soma das faixas 15-19 e 20-24. O PME pede 15-17 e 18-24 separados."
+        "nota": "Aproximacao. Preferir 15-17 e 18-24 da SIDRA 9514."
       },
       "0_14": {
         "label": "0 a 14 anos",
         "valor": 115434,
-        "nota": "Soma 0-4 + 5-9 + 10-14."
+        "nota": "Soma 0-4 + 5-9 + 10-14 (agregados)."
       }
     }
   },

@@ -9830,6 +9830,7 @@ function renderAfd() {
 // ══════════════════════════════════════════════════════════
 
 const FONTE_CENSO_IBGE = 'Fonte: IBGE — <a href="https://www.ibge.gov.br/estatisticas/sociais/populacao/22827-censo-demografico-2022.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Censo Demográfico 2022</a> (Agregados por Municípios)';
+const FONTE_CENSO_IBGE_9514 = 'Fonte: IBGE — <a href="https://sidra.ibge.gov.br/tabela/9514" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">SIDRA Tabela 9514</a> — Censo Demográfico 2022 (idade simples, Resultados do Universo)';
 
 function renderCensoIbge() {
   const main = document.getElementById('main-content');
@@ -9851,6 +9852,8 @@ function renderCensoIbge() {
   const alf = d.alfabetizacao || {};
   const meta = d.metadata || {};
   const faixas = pop.faixas || [];
+  const faixasPme = pop.faixas_pme || {};
+  const faixasPmeList = faixasPme.faixas || [];
   const aprox = pop.aproximacoes_pme || {};
   const anoRef = meta.ano_referencia || 2022;
 
@@ -9861,8 +9864,27 @@ function renderCensoIbge() {
     </div>
 
     <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/matriculas.png" alt=""></span>
+      <span class="section-divider-text">Faixas educacionais (idade simples — SIDRA 9514)</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div id="censo-ibge-pme" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px"></div>
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:4px">
+      <div class="chart-card">
+        <div class="chart-title">População por faixas educacionais — ${anoRef}</div>
+        <div style="height:220px"><canvas id="censo-ibge-chart-pme"></canvas></div>
+        <div class="chart-source">${FONTE_CENSO_IBGE_9514}</div>
+      </div>
+    </div>
+    <p style="font-size:10px;color:#777;margin:0 0 10px;line-height:1.55;font-style:italic">
+      ${faixasPme.nota || meta.nota_faixas || ''}
+      ${faixasPme.total_referencia ? ` Total de referência (9514): ${formatNum(faixasPme.total_referencia)}.` : ''}
+    </p>
+
+    <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
-      <span class="section-divider-text">População por faixa etária</span>
+      <span class="section-divider-text">População por faixa etária (grupos quinquenais)</span>
       <span class="section-divider-line"></span>
     </div>
 
@@ -9878,18 +9900,6 @@ function renderCensoIbge() {
         <div class="chart-source">${FONTE_CENSO_IBGE}</div>
       </div>
     </div>
-
-    <div class="section-divider">
-      <span class="section-divider-icon"><img src="img/icons/matriculas.png" alt=""></span>
-      <span class="section-divider-text">Faixas de interesse educacional (aproximações)</span>
-      <span class="section-divider-line"></span>
-    </div>
-
-    <div id="censo-ibge-aprox" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px"></div>
-    <p style="font-size:10px;color:#777;margin:0 0 10px;line-height:1.55;font-style:italic">
-      ${meta.nota_faixas || 'As faixas etárias do Censo 2022 não coincidem exatamente com as faixas tipicas do PME.'}
-    </p>
-    <div class="chart-source" style="margin-top:0">${FONTE_CENSO_IBGE}</div>
 
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_saeb.png" alt=""></span>
@@ -9911,8 +9921,8 @@ function renderCensoIbge() {
     </div>
 
     <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
-      Fonte: IBGE — Censo Demográfico 2022, agregados por municípios
-      (demografia e alfabetização). Município: Joinville/SC (código IBGE ${meta.co_municipio || '4209102'}).
+      Fonte: IBGE — Censo Demográfico 2022 (Agregados por Municípios + SIDRA 9514).
+      Município: Joinville/SC (código IBGE ${meta.co_municipio || '4209102'}).
       Nível de instrução/escolaridade não está disponível nestes arquivos — apenas alfabetização.
     </p>
   `;
@@ -9965,24 +9975,53 @@ function renderCensoIbge() {
       </div>`).join('');
   }
 
-  // Aproximações PME
-  const aproxEl = document.getElementById('censo-ibge-aprox');
-  if (aproxEl) {
-    const cards = [
-      aprox['0_14'],
-      aprox['5_14'],
-      aprox['15_24'],
-    ].filter(Boolean);
-    const popTotAprox = pop.total || 0;
-    aproxEl.innerHTML = cards.map(c => {
-      const pct = popTotAprox > 0 ? ((c.valor / popTotAprox) * 100).toFixed(1) + '%' : '—';
-      return `
-      <div class="chart-card" style="padding:14px 16px">
+  // Faixas PME oficiais (SIDRA 9514)
+  const pmeEl = document.getElementById('censo-ibge-pme');
+  if (pmeEl && faixasPmeList.length) {
+    const colors = ['#FFCB04', '#003866', '#1565C0', '#2E6FA0', '#6A1B9A'];
+    pmeEl.innerHTML = faixasPmeList.map((c, i) => `
+      <div class="chart-card" style="padding:14px 16px;border-top:3px solid ${colors[i % colors.length]}">
         <div style="font-size:11px;font-weight:600;color:var(--pri);margin-bottom:6px">${c.label}</div>
-        <div style="font-size:1.45rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)} <span style="font-size:0.95rem;font-weight:700;color:#555">(${pct})</span></div>
-        <div style="font-size:9.5px;color:#888;margin-top:6px;line-height:1.4">${c.nota || ''}</div>
-      </div>`;
-    }).join('');
+        <div style="font-size:1.35rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)}</div>
+        <div style="font-size:12px;font-weight:700;color:#555;margin-top:4px">${c.pct != null ? c.pct.toFixed(1) + '%' : '—'} da pop. (9514)</div>
+      </div>`).join('');
+  }
+
+  const pmeChartEl = document.getElementById('censo-ibge-chart-pme');
+  if (pmeChartEl && faixasPmeList.length) {
+    const vals = faixasPmeList.map(f => f.valor || 0);
+    const maxP = Math.max(...vals, 1);
+    S.charts.push(new Chart(pmeChartEl, {
+      type: 'bar',
+      data: {
+        labels: faixasPmeList.map(f => f.label),
+        datasets: [{
+          data: vals,
+          backgroundColor: ['#FFCB04', '#003866', '#1565C0', '#2E6FA0', '#6A1B9A'],
+          borderRadius: 3,
+          maxBarThickness: 48,
+        }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          datalabels: {
+            display: true, anchor: 'end', align: 'end',
+            font: { family: 'Inter', size: 10, weight: '600' }, color: '#444',
+            formatter: (v, ctx) => {
+              const pct = faixasPmeList[ctx.dataIndex]?.pct;
+              return formatNumChart(v) + (pct != null ? `\n${pct.toFixed(1)}%` : '');
+            },
+          },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { ...CHART_DEFAULTS.scales.y, suggestedMax: maxP * 1.18, ticks: { callback: v => formatNumChart(v) } },
+        },
+      },
+    }));
   }
 
   // Chart: faixas etárias
