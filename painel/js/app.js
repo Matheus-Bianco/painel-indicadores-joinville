@@ -44,6 +44,8 @@ const S = {
   afd: null,       // 4_9_afd.json — Adequação da Formação Docente
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
+  ensinoSuperior: null, // 4_12_ensino_superior.json — Censo da Educação Superior
+  _supMetric: 'mat', // métrica da série: mat | ing | conc
   redesData: null, // 4_1_redes.json — Visão por Redes (comparativo dependências)
   conveniadasSed: null, // 4_1_conveniadas_sed.json — lista SED x Censo
   conveniadasSerie: null, // 4_1_conveniadas_serie.json — série histórica p/ merge no Acesso
@@ -271,6 +273,7 @@ function getExportSource() {
   const v = S._currentView || '';
   const sources = {
     acesso: 'Censo Escolar, INEP',
+    'ensino-superior': 'Censo da Educação Superior, INEP',
     infra: 'Censo Escolar, INEP',
     docencia: 'Censo Escolar, INEP',
     escolas: 'Censo Escolar, INEP',
@@ -5932,6 +5935,16 @@ function renderHome() {
 
         <div class="home-divider">
           <span class="home-divider-line"></span>
+          <span class="home-divider-text">Ensino Superior — Censo da Educação Superior</span>
+          <span class="home-divider-line"></span>
+        </div>
+        <p class="home-section-note">Oferta de graduação em Joinville (presencial, EAD e total) — INEP, 2017–2024.</p>
+        <div class="home-grid home-grid-demo">
+          ${cardHTML({ view: 'ensino-superior', icon: 'img/icons/medio.png', title: 'Ensino Superior', desc: 'IES, matrículas, ingressantes e concluintes — presencial e EAD' }, eduSections.length + 1)}
+        </div>
+
+        <div class="home-divider">
+          <span class="home-divider-line"></span>
           <span class="home-divider-text">Documentos e Recursos</span>
           <span class="home-divider-line"></span>
         </div>
@@ -10124,6 +10137,421 @@ function renderCensoIbge() {
 }
 
 // ══════════════════════════════════════════════════════════
+// ENSINO SUPERIOR — CENSO DA EDUCACAO SUPERIOR (INEP)
+// ══════════════════════════════════════════════════════════
+
+const FONTE_SUPERIOR = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-da-educacao-superior" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Censo da Educação Superior</a> · Oferta em Joinville/SC';
+
+const SUP_MOD_COLORS = { presencial: '#003866', ead: '#FFCB04', total: '#EE302F' };
+const SUP_METRIC_LABELS = { mat: 'Matrículas', ing: 'Ingressantes', conc: 'Concluintes' };
+
+function renderEnsinoSuperior() {
+  const main = document.getElementById('main-content');
+  destroyCharts();
+  destroyMap();
+
+  const d = S.ensinoSuperior;
+  if (!d || !d.serie_temporal) {
+    main.innerHTML = `
+      <div class="section-sticky">
+        ${sectionBanner('img/icons/medio.png', 'Ensino Superior', 'Joinville / SC')}
+      </div>
+      <div style="text-align:center;padding:60px 20px;color:var(--text-sec);">
+        <p style="font-size:1.1rem;font-weight:600;">Dados do Censo da Educação Superior não disponíveis</p>
+      </div>`;
+    return;
+  }
+
+  const anos = Object.keys(d.serie_temporal).sort();
+  const anoSel = (S.anoSel && d.serie_temporal[S.anoSel]) ? S.anoSel : anos[anos.length - 1];
+  S.anoSel = anoSel;
+  const metric = SUP_METRIC_LABELS[S._supMetric] ? S._supMetric : 'mat';
+  S._supMetric = metric;
+  const su = d.serie_temporal[anoSel] || {};
+  const mat = su.mat || {};
+  const ing = su.ing || {};
+  const conc = su.conc || {};
+  const cursos = su.cursos || {};
+  const meta = d.metadata || {};
+  const nSede = (d.ies_sede || []).length || su.ies_sede || 0;
+
+  main.innerHTML = `
+    <div class="section-sticky">
+      ${sectionBanner('img/icons/medio.png', 'Ensino Superior', 'Joinville / SC — Censo da Educação Superior')}
+      <div class="kpi-strip" id="sup-kpi-strip" style="grid-template-columns:repeat(7,1fr)"></div>
+    </div>
+
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Recorte: oferta no município</div>
+      <div class="info-banner-rede-municipal-body">
+        Contam cursos com município de oferta = Joinville (código IBGE ${meta.cod_mun || '4209102'}),
+        incluindo polos e EAD de IES sediadas fora. Em ${anoSel} há
+        <strong>${formatNum(su.ies_oferta || 0)} IES com oferta</strong> e
+        <strong>${formatNum(nSede)} com sede/reitoria</strong> no município.
+        Presencial, EAD e Total são sempre apresentados em separado.
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Panorama da Oferta</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px">
+      ${['mat', 'ing', 'conc'].map(k => `
+        <button class="map-layer-btn${metric === k ? ' active' : ''}" data-sup-metric="${k}">${SUP_METRIC_LABELS[k]}</button>
+      `).join('')}
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title">Evolução de ${SUP_METRIC_LABELS[metric]} — Presencial / EAD / Total (${anos[0]}–${anoSel})</div>
+        <div style="height:240px"><canvas id="sup-chart-serie"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">${SUP_METRIC_LABELS[metric]} por modalidade — ${anoSel}</div>
+        <div style="height:240px"><canvas id="sup-chart-mod"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Recortes da Oferta</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title">Matrículas por rede — ${anoSel}</div>
+        <div style="height:220px"><canvas id="sup-chart-rede"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Matrículas por organização acadêmica — ${anoSel}</div>
+        <div style="height:220px"><canvas id="sup-chart-org"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:10px">
+      <div class="chart-card">
+        <div class="chart-title">Matrículas por sexo — ${anoSel}</div>
+        <div style="height:220px"><canvas id="sup-chart-sexo"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Matrículas por cor/raça — ${anoSel}</div>
+        <div style="height:220px"><canvas id="sup-chart-raca"></canvas></div>
+        <div class="chart-source">${FONTE_SUPERIOR}</div>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/escola.png" alt=""></span>
+      <span class="section-divider-text">Instituições com oferta em Joinville</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Ranking de IES por matrículas — ${anoSel} (${(d.por_ies?.[anoSel] || []).length} instituições)</div>
+      <div style="overflow:auto;max-height:420px">
+        <table class="data-table" id="sup-ies-table">
+          <thead><tr>
+            <th>#</th><th>Instituição</th><th>Sede JLLE</th><th>Cursos</th>
+            <th>Mat. Pres.</th><th>Mat. EAD</th><th>Mat. Total</th>
+            <th>Ingressantes</th><th>Concluintes</th>
+          </tr></thead>
+          <tbody id="sup-ies-tbody"></tbody>
+        </table>
+      </div>
+      <div class="chart-source">${FONTE_SUPERIOR}</div>
+    </div>
+
+    <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
+      ${meta.nota || 'Oferta no município de Joinville. Presencial e EAD separados.'}
+      Série ${anos[0]}–${anos[anos.length - 1]}.
+    </p>
+  `;
+
+  // Ano no banner
+  const selAno = document.getElementById('sel-ano');
+  if (selAno) {
+    selAno.innerHTML = anos.map(a => `<option value="${a}" ${a === anoSel ? 'selected' : ''}>${a}</option>`).join('');
+  }
+  bindTopbarFilters();
+
+  // Metric toggle
+  main.querySelectorAll('[data-sup-metric]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S._supMetric = btn.dataset.supMetric;
+      renderEnsinoSuperior();
+    });
+  });
+
+  // KPIs
+  const prev = anos[anos.indexOf(anoSel) - 1];
+  const suPrev = prev ? (d.serie_temporal[prev] || {}) : {};
+  const pctFn = (cur, old) => (cur != null && old != null && old !== 0) ? ((cur - old) / old * 100) : null;
+  const absFn = (cur, old) => (cur != null && old != null) ? (cur - old) : null;
+  const kpis = [
+    { label: 'IES com oferta', val: su.ies_oferta || 0, prev: suPrev.ies_oferta, icon: 'img/icons/escola.png', accent: 'green', note: `${formatNum(nSede)} com sede` },
+    { label: 'Cursos', val: cursos.total || 0, prev: suPrev.cursos?.total, icon: 'img/icons/panorama.png', accent: 'blue', note: `${formatNum(cursos.presencial || 0)} pres. · ${formatNum(cursos.ead || 0)} EAD` },
+    { label: 'Matrículas', val: mat.total || 0, prev: suPrev.mat?.total, icon: 'img/icons/matriculas.png', accent: 'green' },
+    { label: 'Presencial', val: mat.presencial || 0, prev: suPrev.mat?.presencial, icon: 'img/icons/medio.png', accent: 'green', note: mat.total ? ((mat.presencial || 0) / mat.total * 100).toFixed(1) + '% do total' : null },
+    { label: 'EAD', val: mat.ead || 0, prev: suPrev.mat?.ead, icon: 'img/icons/medio.png', accent: 'yellow', note: mat.total ? ((mat.ead || 0) / mat.total * 100).toFixed(1) + '% do total' : null },
+    { label: 'Ingressantes', val: ing.total || 0, prev: suPrev.ing?.total, icon: 'img/icons/matriculas.png', accent: 'blue' },
+    { label: 'Concluintes', val: conc.total || 0, prev: suPrev.conc?.total, icon: 'img/icons/matriculas.png', accent: 'blue' },
+  ];
+  const strip = document.getElementById('sup-kpi-strip');
+  if (strip) {
+    strip.innerHTML = kpis.map((k, i) => {
+      const delta = pctFn(k.val, k.prev);
+      const abs = absFn(k.val, k.prev);
+      const sign = abs > 0 ? '+' : '';
+      let footer = '<span class="kpi-abs">—</span>';
+      if (delta != null) {
+        footer = `<span class="kpi-delta ${deltaClass(delta)}">${deltaArrow(delta)} ${formatPct(delta)}</span>
+          <span class="kpi-abs">${k.note || `${sign}${formatNum(abs)} vs ${prev}`}</span>`;
+      } else if (k.note) {
+        footer = `<span class="kpi-abs">${k.note}</span>`;
+      }
+      return `<div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 60}ms" title="${k.label}: ${formatNum(k.val)}">
+        <div class="kpi-top">
+          <span class="kpi-label">${k.label}</span>
+          <img class="kpi-icon" src="${k.icon}" alt="">
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value" data-target="${k.val}">${formatNum(k.val)}</span>
+        </div>
+        <div class="kpi-footer">${footer}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Serie temporal — 3 linhas
+  const serieEl = document.getElementById('sup-chart-serie');
+  if (serieEl) {
+    const valsP = anos.map(a => d.serie_temporal[a]?.[metric]?.presencial || 0);
+    const valsE = anos.map(a => d.serie_temporal[a]?.[metric]?.ead || 0);
+    const valsT = anos.map(a => d.serie_temporal[a]?.[metric]?.total || 0);
+    const maxV = Math.max(...valsT, 1);
+    S.charts.push(new Chart(serieEl, {
+      type: 'line',
+      data: {
+        labels: anos,
+        datasets: [
+          { label: 'Presencial', data: valsP, borderColor: SUP_MOD_COLORS.presencial, backgroundColor: SUP_MOD_COLORS.presencial, tension: 0.25, pointRadius: 3, borderWidth: 2 },
+          { label: 'EAD', data: valsE, borderColor: SUP_MOD_COLORS.ead, backgroundColor: SUP_MOD_COLORS.ead, tension: 0.25, pointRadius: 3, borderWidth: 2 },
+          { label: 'Total', data: valsT, borderColor: SUP_MOD_COLORS.total, backgroundColor: SUP_MOD_COLORS.total, tension: 0.25, pointRadius: 3, borderWidth: 2.5 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        layout: { padding: { top: 18 } },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: { ...DL_LINE, formatter: (v, ctx) => (ctx.dataset.label === 'Total' ? formatNumChart(v) : '') },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { ...CHART_DEFAULTS.scales.y, suggestedMax: maxV * 1.15, ticks: { callback: v => formatNumChart(v) } },
+        },
+      },
+    }));
+  }
+
+  // Barras modalidade
+  const modEl = document.getElementById('sup-chart-mod');
+  if (modEl) {
+    const block = su[metric] || {};
+    const modVals = [block.presencial || 0, block.ead || 0, block.total || 0];
+    S.charts.push(new Chart(modEl, {
+      type: 'bar',
+      data: {
+        labels: ['Presencial', 'EAD', 'Total'],
+        datasets: [{
+          data: modVals,
+          backgroundColor: [SUP_MOD_COLORS.presencial, SUP_MOD_COLORS.ead, SUP_MOD_COLORS.total],
+          borderRadius: 3, maxBarThickness: 48,
+        }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, datalabels: DL_BAR },
+        scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, suggestedMax: Math.max(...modVals, 1) * 1.15 } },
+      },
+    }));
+  }
+
+  // Rede publica/privada — grouped bars Presencial/EAD
+  const redeEl = document.getElementById('sup-chart-rede');
+  const redeAno = d.por_rede?.[anoSel] || {};
+  if (redeEl) {
+    const labels = ['Pública', 'Privada'];
+    const keys = ['publica', 'privada'];
+    S.charts.push(new Chart(redeEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Presencial', data: keys.map(k => redeAno[k]?.mat?.presencial || 0), backgroundColor: SUP_MOD_COLORS.presencial, borderRadius: 2, maxBarThickness: 36 },
+          { label: 'EAD', data: keys.map(k => redeAno[k]?.mat?.ead || 0), backgroundColor: SUP_MOD_COLORS.ead, borderRadius: 2, maxBarThickness: 36 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: DL_BAR,
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: {
+            ...CHART_DEFAULTS.scales.y,
+            suggestedMax: Math.max(
+              ...(keys.flatMap(k => [redeAno[k]?.mat?.presencial || 0, redeAno[k]?.mat?.ead || 0])),
+              1
+            ) * 1.15,
+          },
+        },
+      },
+    }));
+  }
+
+  // Org academica — horizontal stacked Presencial+EAD
+  const orgEl = document.getElementById('sup-chart-org');
+  const orgAno = d.por_org_academica?.[anoSel] || {};
+  if (orgEl) {
+    const orgRows = Object.entries(orgAno)
+      .map(([label, v]) => ({ label, p: v.mat?.presencial || 0, e: v.mat?.ead || 0, t: v.mat?.total || 0 }))
+      .filter(r => r.t > 0)
+      .sort((a, b) => b.t - a.t);
+    const maxStack = Math.max(...orgRows.map(r => r.t), 1);
+    S.charts.push(new Chart(orgEl, {
+      type: 'bar',
+      data: {
+        labels: orgRows.map(r => r.label),
+        datasets: [
+          { label: 'Presencial', data: orgRows.map(r => r.p), backgroundColor: SUP_MOD_COLORS.presencial, borderRadius: 2, maxBarThickness: 20 },
+          { label: 'EAD', data: orgRows.map(r => r.e), backgroundColor: SUP_MOD_COLORS.ead, borderRadius: 2, maxBarThickness: 20 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: {
+            display: true, color: '#fff',
+            font: { family: 'Inter', size: 8, weight: '600' },
+            formatter: v => (v >= 200 ? formatNumChart(v) : ''),
+          },
+        },
+        scales: {
+          x: {
+            stacked: true, beginAtZero: true, max: Math.ceil(maxStack * 1.15),
+            ticks: { callback: v => formatNumChart(v), font: { family: 'Inter', size: 9 } },
+            grid: { color: 'rgba(0,0,0,.06)' },
+          },
+          y: { stacked: true, ticks: { font: { family: 'Inter', size: 9 } }, grid: { display: false } },
+        },
+      },
+    }));
+  }
+
+  // Sexo — barras agrupadas por modalidade
+  const sexoEl = document.getElementById('sup-chart-sexo');
+  const sexo = d.perfil_alunos?.[anoSel]?.sexo || {};
+  if (sexoEl) {
+    S.charts.push(new Chart(sexoEl, {
+      type: 'bar',
+      data: {
+        labels: ['Presencial', 'EAD', 'Total'],
+        datasets: [
+          { label: 'Masculino', data: ['presencial', 'ead', 'total'].map(m => sexo[m]?.masculino || 0), backgroundColor: COLORS.masc, borderRadius: 2, maxBarThickness: 32 },
+          { label: 'Feminino', data: ['presencial', 'ead', 'total'].map(m => sexo[m]?.feminino || 0), backgroundColor: COLORS.fem, borderRadius: 2, maxBarThickness: 32 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: DL_BAR,
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: {
+            ...CHART_DEFAULTS.scales.y,
+            suggestedMax: Math.max(
+              ...( ['presencial', 'ead', 'total'].flatMap(m => [sexo[m]?.masculino || 0, sexo[m]?.feminino || 0])),
+              1
+            ) * 1.15,
+          },
+        },
+      },
+    }));
+  }
+
+  // Raca — stacked horizontal (total)
+  const racaEl = document.getElementById('sup-chart-raca');
+  const raca = d.perfil_alunos?.[anoSel]?.raca?.total || {};
+  if (racaEl) {
+    const racaKeys = [
+      { k: 'branca', label: 'Branca', c: COLORS.branca },
+      { k: 'preta', label: 'Preta', c: COLORS.preta },
+      { k: 'parda', label: 'Parda', c: COLORS.parda },
+      { k: 'amarela', label: 'Amarela', c: COLORS.amarela },
+      { k: 'indigena', label: 'Indígena', c: COLORS.indigena },
+      { k: 'nao_declarada', label: 'Não declarada', c: COLORS.nd },
+    ];
+    const vals = racaKeys.map(r => raca[r.k] || 0);
+    const maxR = Math.max(...vals, 1);
+    S.charts.push(new Chart(racaEl, {
+      type: 'bar',
+      data: {
+        labels: racaKeys.map(r => r.label),
+        datasets: [{ data: vals, backgroundColor: racaKeys.map(r => r.c), borderRadius: 2, maxBarThickness: 28 }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, datalabels: DL_BAR },
+        scales: {
+          x: { beginAtZero: true, max: Math.ceil(maxR * 1.15), ticks: { callback: v => formatNumChart(v), font: { family: 'Inter', size: 9 } }, grid: { color: 'rgba(0,0,0,.06)' } },
+          y: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        },
+      },
+    }));
+  }
+
+  // Tabela IES
+  const tbody = document.getElementById('sup-ies-tbody');
+  if (tbody) {
+    const lista = d.por_ies?.[anoSel] || [];
+    tbody.innerHTML = lista.map((e, i) => `
+      <tr style="${e.sede_joinville ? 'background:rgba(0,56,102,.04)' : ''}">
+        <td>${i + 1}</td>
+        <td title="${e.no_ies}">${e.sg_ies ? `<strong>${e.sg_ies}</strong> — ` : ''}${e.no_ies}</td>
+        <td>${e.sede_joinville ? '<span class="tag-conveniada" style="background:#003866">Sede</span>' : '—'}</td>
+        <td>${formatNum(e.cursos_total || 0)}</td>
+        <td>${formatNum(e.mat_pres || 0)}</td>
+        <td>${formatNum(e.mat_ead || 0)}</td>
+        <td><strong>${formatNum(e.mat_total || 0)}</strong></td>
+        <td>${formatNum(e.ing_total || 0)}</td>
+        <td>${formatNum(e.conc_total || 0)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // DISTORÇÃO IDADE-SÉRIE (TDI)
 // ══════════════════════════════════════════════════════════
 
@@ -10958,6 +11386,7 @@ function initNav() {
 
       if (view === 'acesso' && S.data) { renderAcesso(); }
       else if (view === 'censo-ibge') { renderCensoIbge(); }
+      else if (view === 'ensino-superior') { renderEnsinoSuperior(); }
       else if (view === 'redes') { ensureRedes(); }
       else if (view === 'fluxo') { renderFluxo(); }
       else if (view === 'infra' && S.infra) { renderInfra(); }
@@ -12165,6 +12594,7 @@ function refreshActiveTab() {
   if (view === 'home') renderHome();
   else if (view === 'acesso' && S.data) renderAcesso();
   else if (view === 'censo-ibge') renderCensoIbge();
+  else if (view === 'ensino-superior') renderEnsinoSuperior();
   else if (view === 'redes') ensureRedes();
   else if (view === 'fluxo') renderFluxo();
   else if (view === 'infra' && S.infra) renderInfra();
@@ -15090,6 +15520,9 @@ const EXTRACAO_DATASETS = [
   { id: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas',
     desc: 'Matrículas por etapa, perfil dos alunos (sexo/raça), integral, noturno e educação especial.',
     fonte: 'INEP — Censo Escolar', file: 'dados/4_1_acesso_matriculas.json', state: 'data' },
+  { id: 'ensino-superior', icon: 'img/icons/medio.png', title: 'Ensino Superior',
+    desc: 'Oferta em Joinville: IES, cursos, matrículas, ingressantes e concluintes (presencial/EAD/total).',
+    fonte: 'INEP — Censo da Educação Superior', file: 'dados/4_12_ensino_superior.json', state: 'ensinoSuperior' },
   { id: 'infra', icon: 'img/icons/nav_infra.png', title: 'Infraestrutura',
     desc: 'Recursos físicos e tecnológicos das escolas (% de oferta por categoria).',
     fonte: 'INEP — Censo Escolar', file: 'dados/4_5_infraestrutura.json', state: 'infra' },
@@ -15308,7 +15741,7 @@ async function init() {
   try {
     const cb = '?_cb=' + Date.now();
     if (JV_MODE) {
-      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv, respConvSerie] = await Promise.all([
+      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv, respConvSerie, respSup] = await Promise.all([
         fetch('dados/4_1_acesso_matriculas.json' + cb),
         fetch(JV.geoFile + cb),
         fetch('dados/4_5_infraestrutura.json' + cb),
@@ -15325,6 +15758,7 @@ async function init() {
         fetch('dados/4_11_censo_ibge_municipal.json' + cb),
         fetch('dados/escolas_conveniadas.json' + cb),
         fetch('dados/4_1_conveniadas_serie.json' + cb),
+        fetch('dados/4_12_ensino_superior.json' + cb),
       ]);
       if (!respData.ok) throw new Error(`HTTP ${respData.status} — acesso`);
       S.data = await respData.json();
@@ -15345,6 +15779,9 @@ async function init() {
       if (respTdi.ok) S.tdi = await respTdi.json();
       if (respEscolas.ok) S.escolasData = await respEscolas.json();
       if (respCensoIbge.ok) S.censoIbge = await respCensoIbge.json();
+      if (respSup.ok) {
+        try { S.ensinoSuperior = await respSup.json(); } catch (e) { console.warn('ensino_superior', e); }
+      }
       if (respEscConv.ok) {
         S._escolasConveniadas = await respEscConv.json();
         S.escolasData = mergeMunicipalEscolasWithConveniadas(S.escolasData, S._escolasConveniadas);
