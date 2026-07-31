@@ -9045,9 +9045,9 @@ const AFD_ETAPAS = [
   { key: 'fund_total', label: 'Fundamental (Total)', short: 'Fund.' },
   { key: 'fund_ai', label: 'Anos Iniciais', short: 'Anos Iniciais' },
   { key: 'fund_af', label: 'Anos Finais', short: 'Anos Finais' },
-  ...(JV_MODE ? [] : [{ key: 'medio', label: 'Ensino Médio', short: 'Médio' }]),
+  { key: 'medio', label: 'Ensino Médio', short: 'Médio' },
   { key: 'eja_fund', label: 'EJA Fundamental', short: 'EJA F' },
-  ...(JV_MODE ? [] : [{ key: 'eja_medio', label: 'EJA Médio', short: 'EJA M' }]),
+  { key: 'eja_medio', label: 'EJA Médio', short: 'EJA M' },
 ];
 
 function renderAfd() {
@@ -9106,6 +9106,10 @@ function renderAfd() {
   let geoLabel = sectionSubtitle();
   if (S.munSel && lookup[S.munSel]) geoLabel = lookup[S.munSel];
   else if (S.creSel) geoLabel = (S.creLookup?.cre_list?.find(c => c.cod_cre === S.creSel)?.nome_cre) || `CRE ${S.creSel}`;
+
+  // Médio / EJA Médio: mostrar só quando a dependência tiver a etapa nos dados
+  const hasMedio = !!(displayData && displayData.medio);
+  const hasEjaMedio = !!(displayData && displayData.eja_medio);
 
   const avisoPrivadaAfd = (JV_MODE && S.redeSel === 'particular') ? `
     <div class="info-banner-rede-municipal" role="note">
@@ -9210,10 +9214,11 @@ function renderAfd() {
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:11px;font-weight:700;color:#555">Etapa:</span>
             <select id="afd-evol-etapa-select" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #bbb;font-family:Inter;background:#fff;cursor:pointer;font-weight:600;color:var(--pri)">
-              ${JV_MODE ? '' : '<option value="medio" selected>Ensino Médio</option>'}
-              <option value="fund_ai" ${JV_MODE ? 'selected' : ''}>Anos Iniciais</option>
+              ${hasMedio ? '<option value="medio" selected>Ensino Médio</option>' : ''}
+              <option value="fund_ai" ${hasMedio ? '' : 'selected'}>Anos Iniciais</option>
               <option value="fund_af">Anos Finais</option>
-              <option value="eja_fund">EJA</option>
+              <option value="eja_fund">EJA Fund.</option>
+              ${hasEjaMedio ? '<option value="eja_medio">EJA Médio</option>' : ''}
             </select>
           </div>
           <div style="width:1px;height:20px;background:#e0e0e0"></div>
@@ -9248,9 +9253,9 @@ function renderAfd() {
               <option value="fund_total" selected>Fund. Total</option>
               <option value="fund_ai">Anos Iniciais</option>
               <option value="fund_af">Anos Finais</option>
-              ${JV_MODE ? '' : '<option value="medio">Médio</option>'}
+              ${hasMedio ? '<option value="medio">Médio</option>' : ''}
               <option value="eja_fund">EJA Fund.</option>
-              ${JV_MODE ? '' : '<option value="eja_medio">EJA Médio</option>'}
+              ${hasEjaMedio ? '<option value="eja_medio">EJA Médio</option>' : ''}
             </select>
             ${JV_MODE ? '' : `
             <div class="map-layer-toggle">
@@ -9288,15 +9293,15 @@ function renderAfd() {
   const strip = document.getElementById('afd-kpis');
   if (strip) {
     const g3General = (() => {
-      const etapas = (JV_MODE ? ['fund_total'] : ['fund_total', 'medio']).filter(e => displayData[e]);
+      const etapas = ['fund_total', ...(hasMedio ? ['medio'] : [])].filter(e => displayData[e]);
       if (!etapas.length) return 0;
       return (etapas.reduce((s, e) => s + (displayData[e].g3 || 0), 0) / etapas.length).toFixed(1);
     })();
     const kpis = [
       { label: `G1 Fundamental (${anoSel})`, value: displayData.fund_total?.g1 != null ? displayData.fund_total.g1.toFixed(1) + '%' : '—', icon: 'img/icons/sec_docentes.png', accent: (displayData.fund_total?.g1 || 0) >= 60 ? 'green' : 'red', noFormat: true },
-      ...(JV_MODE
-        ? [{ label: `G1 Anos Iniciais (${anoSel})`, value: displayData.fund_ai?.g1 != null ? displayData.fund_ai.g1.toFixed(1) + '%' : '—', icon: 'img/icons/sec_docentes.png', accent: (displayData.fund_ai?.g1 || 0) >= 60 ? 'green' : 'red', noFormat: true }]
-        : [{ label: `G1 Ens. Médio (${anoSel})`, value: displayData.medio?.g1 != null ? displayData.medio.g1.toFixed(1) + '%' : '—', icon: 'img/icons/sec_docentes.png', accent: (displayData.medio?.g1 || 0) >= 60 ? 'green' : 'red', noFormat: true }]),
+      ...(hasMedio
+        ? [{ label: `G1 Ens. Médio (${anoSel})`, value: displayData.medio?.g1 != null ? displayData.medio.g1.toFixed(1) + '%' : '—', icon: 'img/icons/medio.png', accent: (displayData.medio?.g1 || 0) >= 60 ? 'green' : 'red', noFormat: true }]
+        : [{ label: `G1 Anos Iniciais (${anoSel})`, value: displayData.fund_ai?.g1 != null ? displayData.fund_ai.g1.toFixed(1) + '%' : '—', icon: 'img/icons/sec_docentes.png', accent: (displayData.fund_ai?.g1 || 0) >= 60 ? 'green' : 'red', noFormat: true }]),
       { label: 'G3 — Outra Licenciatura', value: g3General + '%', icon: 'img/icons/politicas.png', accent: parseFloat(g3General) > 25 ? 'red' : 'green', noFormat: true },
       { label: `Escolas (${anoSel})`, value: displayData.total_escolas || st.total_escolas || 0, icon: 'img/icons/escola.png', accent: 'green' },
     ];
@@ -9315,11 +9320,9 @@ function renderAfd() {
   // ── Chart 1: Grouped bar by etapa (uses header year filter) ──
   const etapaEl = document.getElementById('afd-chart-etapa');
   if (etapaEl) {
-    const chartEtapas = AFD_ETAPAS.filter(e => e.key !== 'fund_total' && e.key !== 'eja_medio' && displayData[e.key]);
-    const ejaF = displayData['eja_fund'];
-    const ejaM = displayData['eja_medio'];
-    const mergedEjaLabel = (ejaF && ejaM) ? 'EJA' : null;
-    const labels = chartEtapas.map(e => e.key === 'eja_fund' && mergedEjaLabel ? mergedEjaLabel : e.short);
+    // Exibe etapas presentes nos dados (inclui Médio / EJA Médio quando houver)
+    const chartEtapas = AFD_ETAPAS.filter(e => e.key !== 'fund_total' && displayData[e.key]);
+    const labels = chartEtapas.map(e => e.short);
     const gKeys = ['g1','g2','g3','g4','g5'];
     S.charts.push(new Chart(etapaEl, {
       type: 'bar',
@@ -9327,12 +9330,7 @@ function renderAfd() {
         labels: labels,
         datasets: gKeys.map(gk => ({
           label: AFD_GROUPS[gk].short,
-          data: chartEtapas.map(e => {
-            if (e.key === 'eja_fund' && mergedEjaLabel && ejaF && ejaM) {
-              return +((ejaF[gk] + ejaM[gk]) / 2).toFixed(1);
-            }
-            return displayData[e.key]?.[gk] || 0;
-          }),
+          data: chartEtapas.map(e => displayData[e.key]?.[gk] || 0),
           backgroundColor: AFD_GROUPS[gk].color + 'CC',
           borderColor: AFD_GROUPS[gk].color,
           borderWidth: 0.5,
@@ -9386,12 +9384,13 @@ function renderAfd() {
     const evolEtapas = [
       { key: 'fund_ai', label: 'Anos Iniciais', color: COLORS.pri },
       { key: 'fund_af', label: 'Anos Finais', color: '#F57C00' },
-      ...(JV_MODE ? [] : [{ key: 'medio', label: 'Ensino Médio', color: COLORS.red }]),
-      { key: 'eja_fund', label: 'EJA', color: COLORS.federal },
-    ];
+      ...(hasMedio ? [{ key: 'medio', label: 'Ensino Médio', color: COLORS.red }] : []),
+      { key: 'eja_fund', label: 'EJA Fund.', color: COLORS.federal },
+      ...(hasEjaMedio ? [{ key: 'eja_medio', label: 'EJA Médio', color: '#6A1B9A' }] : []),
+    ].filter(e => displayData[e.key] || geoTs.some(ts => ts && ts[e.key]));
     const evolGroups = ['g1','g2','g3','g4','g5'];
     let selGroups = ['g1'];
-    let selEtapa = JV_MODE ? 'fund_ai' : 'medio';
+    let selEtapa = hasMedio ? 'medio' : 'fund_ai';
     let evolChart = null;
 
     const buildEvolChart = () => {
