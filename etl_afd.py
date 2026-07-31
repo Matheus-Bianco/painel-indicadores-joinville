@@ -25,8 +25,13 @@ ETAPAS = [
     ('eja_medio',  39),   # EJA Médio: cols 39-43
 ]
 
+# Chave do painel -> valor da coluna Dependencia Administrativa no arquivo INEP
+# Obs.: o AFD do INEP nao separa Particular/Filantropica — tudo vem como "Privada".
 REDES = {
     'municipal': 'Municipal',
+    'estadual': 'Estadual',
+    'federal': 'Federal',
+    'particular': 'Privada',  # toggle "Particular" do painel = Privada no AFD
 }
 
 def safe_float(v):
@@ -180,6 +185,16 @@ def main():
     print("\nGerando JSONs...")
     
     main_json = build_json('Municipal')
+    main_json['metadata'] = {
+        'fonte': 'INEP — Indicador de Adequacao da Formacao Docente',
+        'municipio': 'Joinville',
+        'co_municipio': '4209102',
+        'rede': 'municipal',
+        'nota_privada': (
+            'No arquivo AFD do INEP a dependencia privada aparece agregada como "Privada" '
+            '(sem separacao Particular/Filantropica). No painel, o toggle Particular usa esses dados.'
+        ),
+    }
     with open(os.path.join(DST, '4_9_afd.json'), 'w', encoding='utf-8') as f:
         json.dump(main_json, f, ensure_ascii=False)
     print(f"  4_9_afd.json — {len(anos)} anos, {len(main_json['lookup_municipios'])} municípios")
@@ -187,6 +202,18 @@ def main():
     # Per-network JSONs
     for key, dep_name in REDES.items():
         net_json = build_json(dep_name)
+        net_json['metadata'] = {
+            'fonte': 'INEP — Indicador de Adequacao da Formacao Docente',
+            'municipio': 'Joinville',
+            'co_municipio': '4209102',
+            'rede': key,
+            'dependencia_inep': dep_name,
+        }
+        if key == 'particular':
+            net_json['metadata']['nota'] = (
+                'Equivale a Dependencia "Privada" no AFD/INEP '
+                '(particular + filantropica agregadas na fonte).'
+            )
         fname = f'4_9_afd_{key}.json'
         with open(os.path.join(DST, fname), 'w', encoding='utf-8') as f:
             json.dump(net_json, f, ensure_ascii=False)

@@ -120,7 +120,7 @@ const REDE_LABELS = JV_MODE ? {
 };
 
 /** Views com JSON multi-dependência em Joinville */
-const JV_MULTI_REDE_VIEWS = new Set(['acesso', 'infra', 'docencia']);
+const JV_MULTI_REDE_VIEWS = new Set(['acesso', 'infra', 'docencia', 'afd']);
 
 /** Subtítulo geográfico das seções */
 function sectionSubtitle() {
@@ -951,9 +951,10 @@ async function switchRede(rede) {
     // Re-populate municipality dropdown
     populateMunDropdown(S.creSel);
     if (JV_MODE) {
-      // Multi-dependência só para Acesso / Infra / Docência (recorte Joinville)
+      // Multi-dependência: Acesso / Infra / Docência / AFD (recorte Joinville)
       if (cached.infra) S.infra = cached.infra;
       if (cached.docentes) S.doc = cached.docentes;
+      if (cached.afd) S.afd = cached.afd;
       // Mapa/tabela territorial: trocar escolas da dependencia selecionada
       S.escolasData = cached.escolas || { escolas: [], metadata: { rede, total_escolas: 0 } };
       if (rede === 'municipal') {
@@ -9054,11 +9055,14 @@ function renderAfd() {
   destroyCharts(); destroyMap();
 
   const afd = S.afd;
+  const afdToggleDisabled = ['filantropica'];
+  const afdToggleMsg = 'O AFD do INEP agrega a rede privada como "Privada" (sem separar Particular e Filantrópica). Use o botão Particular.';
+
   if (!afd) {
     main.innerHTML = `
       <div class="section-sticky">
         ${sectionBanner('img/icons/sec_docentes.png', 'Adequação da Formação Docente', sectionSubtitle())}
-        ${redeToggleHTML()}
+        ${redeToggleHTML(afdToggleDisabled, afdToggleMsg)}
       </div>
       <div style="text-align:center;padding:60px 20px;color:var(--text-sec);">
         <p style="font-size:1.1rem;font-weight:600;">Dados de Adequação da Formação Docente não disponíveis para a ${getRedeLabel()}</p>
@@ -9103,14 +9107,24 @@ function renderAfd() {
   if (S.munSel && lookup[S.munSel]) geoLabel = lookup[S.munSel];
   else if (S.creSel) geoLabel = (S.creLookup?.cre_list?.find(c => c.cod_cre === S.creSel)?.nome_cre) || `CRE ${S.creSel}`;
 
+  const avisoPrivadaAfd = (JV_MODE && S.redeSel === 'particular') ? `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Rede Privada no AFD (INEP)</div>
+      <div class="info-banner-rede-municipal-body">
+        Neste indicador, o INEP publica a dependência agregada como <strong>Privada</strong>
+        (sem separar Particular e Filantrópica). Os números deste toggle correspondem a esse total.
+      </div>
+    </div>` : '';
+
   main.innerHTML = `
     <div class="section-sticky">
       ${sectionBanner('img/icons/sec_docentes.png', 'Adequação da Formação Docente', geoLabel)}
-      ${redeToggleHTML()}
+      ${redeToggleHTML(afdToggleDisabled, afdToggleMsg)}
       <div class="kpi-strip" id="afd-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
     </div>
 
     ${avisoEscolasDiretasMunicipalHTML()}
+    ${avisoPrivadaAfd}
 
     <!-- ═══ BLOCO INFORMATIVO: O que é a AFD? ═══ -->
     <div class="section-divider">
