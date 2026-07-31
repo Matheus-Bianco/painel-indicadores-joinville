@@ -1,17 +1,19 @@
 {
   "metadata": {
-    "fonte": "IBGE - Censo Demografico 2022",
+    "fonte": "IBGE - Censo Demografico 2022 + Estimativas da populacao",
     "arquivos": [
       "Agregados_por_municipios_demografia_BR.xlsx",
       "Agregados_por_municipios_alfabetizacao_BR.xlsx",
-      "tabela9514.xlsx"
+      "tabela9514.xlsx",
+      "POP2024_20241230.xls",
+      "POP2025_20260113.xls"
     ],
     "municipio": "Joinville",
     "uf": "SC",
     "co_municipio": "4209102",
     "ano_referencia": 2022,
-    "nota_faixas": "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 (idade simples, Resultados do Universo). Grupos quinquenais vêm dos Agregados por Municipios. Totais podem diferir ligeiramente entre as duas fontes.",
-    "gerado_em": "2026-07-31T10:00:07.129923"
+    "nota_faixas": "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 (idade simples, Resultados do Universo). Projecoes 2023-2025: estrutura 2022 x totais oficiais IBGE. Grupos quinquenais vêm dos Agregados por Municipios.",
+    "gerado_em": "2026-07-31T10:15:38.951297"
   },
   "populacao": {
     "total": 614054,
@@ -110,6 +112,191 @@
           "pct": 66.9
         }
       ]
+    },
+    "projecoes_pme": {
+      "metodologia": {
+        "titulo": "Projecao das faixas educacionais 2022-2025",
+        "metodo": "Estrutura etaria constante do Censo 2022 (SIDRA 9514), escalada pelo total populacional oficial de cada ano.",
+        "formula": "faixa_t = (faixa_2022 / pop_2022) x pop_total_t",
+        "arredondamento": "Maior resto (largest remainder), para a soma das faixas fechar no total do ano.",
+        "limitacao": "O IBGE nao publica projecao por idade no nivel municipal. Esta serie assume que a composicao etaria de 2022 se mantem; apenas o total acompanha as Estimativas IBGE (2024 e 2025).",
+        "ancoras": [
+          {
+            "ano": "2022",
+            "total": 616317,
+            "fonte": "SIDRA 9514 (Censo 2022)"
+          },
+          {
+            "ano": "2023",
+            "total": 616317,
+            "fonte": "IBGE — em 2023 publicou no DOU as populacoes do Censo 2022 (sem estimativa intercensitaria propria)"
+          },
+          {
+            "ano": "2024",
+            "total": 654888,
+            "fonte": "IBGE Estimativas da populacao residente — 1o jul/2024 (POP2024_20241230.xls)"
+          },
+          {
+            "ano": "2025",
+            "total": 664541,
+            "fonte": "IBGE Estimativas da populacao residente — 1o jul/2025 (POP2025_20260113.xls)"
+          }
+        ],
+        "urls": [
+          "https://sidra.ibge.gov.br/tabela/9514",
+          "https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html"
+        ]
+      },
+      "por_ano": {
+        "2022": {
+          "total": 616317,
+          "tipo": "censo",
+          "fonte_total": "SIDRA 9514 (Censo 2022)",
+          "faixas": [
+            {
+              "key": "0_3",
+              "label": "0 a 3 anos",
+              "valor": 28956,
+              "pct": 4.7
+            },
+            {
+              "key": "6_14",
+              "label": "6 a 14 anos",
+              "valor": 70881,
+              "pct": 11.5
+            },
+            {
+              "key": "15_17",
+              "label": "15 a 17 anos",
+              "valor": 23278,
+              "pct": 3.8
+            },
+            {
+              "key": "18_24",
+              "label": "18 a 24 anos",
+              "valor": 65501,
+              "pct": 10.6
+            },
+            {
+              "key": "25_mais",
+              "label": "25 anos ou mais",
+              "valor": 412068,
+              "pct": 66.9
+            }
+          ]
+        },
+        "2023": {
+          "total": 616317,
+          "tipo": "censo_fpm",
+          "fonte_total": "IBGE — em 2023 publicou no DOU as populacoes do Censo 2022 (sem estimativa intercensitaria propria)",
+          "faixas": [
+            {
+              "key": "0_3",
+              "label": "0 a 3 anos",
+              "valor": 28956,
+              "pct": 4.7
+            },
+            {
+              "key": "6_14",
+              "label": "6 a 14 anos",
+              "valor": 70881,
+              "pct": 11.5
+            },
+            {
+              "key": "15_17",
+              "label": "15 a 17 anos",
+              "valor": 23278,
+              "pct": 3.8
+            },
+            {
+              "key": "18_24",
+              "label": "18 a 24 anos",
+              "valor": 65501,
+              "pct": 10.6
+            },
+            {
+              "key": "25_mais",
+              "label": "25 anos ou mais",
+              "valor": 412068,
+              "pct": 66.9
+            }
+          ]
+        },
+        "2024": {
+          "total": 654888,
+          "tipo": "estimativa",
+          "fonte_total": "IBGE Estimativas da populacao residente — 1o jul/2024 (POP2024_20241230.xls)",
+          "faixas": [
+            {
+              "key": "0_3",
+              "label": "0 a 3 anos",
+              "valor": 30769,
+              "pct": 4.7
+            },
+            {
+              "key": "6_14",
+              "label": "6 a 14 anos",
+              "valor": 75317,
+              "pct": 11.5
+            },
+            {
+              "key": "15_17",
+              "label": "15 a 17 anos",
+              "valor": 24735,
+              "pct": 3.8
+            },
+            {
+              "key": "18_24",
+              "label": "18 a 24 anos",
+              "valor": 69601,
+              "pct": 10.6
+            },
+            {
+              "key": "25_mais",
+              "label": "25 anos ou mais",
+              "valor": 437857,
+              "pct": 66.9
+            }
+          ]
+        },
+        "2025": {
+          "total": 664541,
+          "tipo": "estimativa",
+          "fonte_total": "IBGE Estimativas da populacao residente — 1o jul/2025 (POP2025_20260113.xls)",
+          "faixas": [
+            {
+              "key": "0_3",
+              "label": "0 a 3 anos",
+              "valor": 31222,
+              "pct": 4.7
+            },
+            {
+              "key": "6_14",
+              "label": "6 a 14 anos",
+              "valor": 76428,
+              "pct": 11.5
+            },
+            {
+              "key": "15_17",
+              "label": "15 a 17 anos",
+              "valor": 25100,
+              "pct": 3.8
+            },
+            {
+              "key": "18_24",
+              "label": "18 a 24 anos",
+              "valor": 70627,
+              "pct": 10.6
+            },
+            {
+              "key": "25_mais",
+              "label": "25 anos ou mais",
+              "valor": 444311,
+              "pct": 66.9
+            }
+          ]
+        }
+      }
     },
     "aproximacoes_pme": {
       "5_14": {

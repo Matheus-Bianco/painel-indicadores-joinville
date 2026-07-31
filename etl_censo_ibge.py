@@ -96,10 +96,125 @@ def build_faixas_pme(ages, total_9514):
     }
 
 
+def load_estimativa_ibge(path):
+    """Le arquivo oficial POPYYYY_*.xls e retorna populacao de Joinville."""
+    xl = pd.ExcelFile(path)
+    sheet = xl.sheet_names[1]
+    df = pd.read_excel(path, sheet_name=sheet, header=1)
+    df.columns = [str(c).strip() for c in df.columns]
+    nome_col = [c for c in df.columns if "NOME" in c.upper()][0]
+    pop_col = [c for c in df.columns if "POPULA" in c.upper()][0]
+    uf_col = [c for c in df.columns if c.upper() == "UF"][0]
+    cod_uf = [c for c in df.columns if "COD. UF" in c.upper()][0]
+    cod_mun = [c for c in df.columns if "COD. MUNIC" in c.upper()][0]
+    m = df[
+        (df[nome_col].astype(str).str.contains("Joinville", case=False, na=False))
+        & (df[uf_col].astype(str) == "SC")
+    ]
+    if m.empty:
+        raise SystemExit(f"Joinville nao encontrado em {path}")
+    r = m.iloc[0]
+    code = f"{int(r[cod_uf]):02d}{int(r[cod_mun]):05d}"
+    if code != CO_MUN:
+        raise SystemExit(f"Codigo inesperado em {path}: {code}")
+    return si(r[pop_col])
+
+
+def scale_faixas_largest_remainder(base_faixas, total_base, total_target):
+    """Escala faixas mantendo soma = total_target (metodo do maior resto)."""
+    if not total_base:
+        return [0] * len(base_faixas)
+    # Mesmo total: preserva valores do Censo (evita drift de ponto flutuante)
+    if total_target == total_base:
+        return [f["valor"] for f in base_faixas]
+    raw = [(f["valor"] / total_base) * total_target for f in base_faixas]
+    floors = [int(x) for x in raw]
+    rem = total_target - sum(floors)
+    order = sorted(range(len(raw)), key=lambda i: (raw[i] - floors[i]), reverse=True)
+    for i in order[: max(rem, 0)]:
+        floors[i] += 1
+    if rem < 0:
+        order_neg = sorted(range(len(raw)), key=lambda i: (raw[i] - floors[i]))
+        for i in order_neg[: -rem]:
+            if floors[i] > 0:
+                floors[i] -= 1
+    return floors
+
+
+def build_projecoes_pme(faixas_pme, pop_2024, pop_2025):
+    base = faixas_pme["faixas"]
+    total_2022 = faixas_pme["total_referencia"]
+    # 2023: IBGE nao publicou estimativa propria; usou populacoes do Censo 2022 no FPM
+    totais = {
+        "2022": {"valor": total_2022, "tipo": "censo", "fonte": "SIDRA 9514 (Censo 2022)"},
+        "2023": {
+            "valor": total_2022,
+            "tipo": "censo_fpm",
+            "fonte": "IBGE — em 2023 publicou no DOU as populacoes do Censo 2022 (sem estimativa intercensitaria propria)",
+        },
+        "2024": {
+            "valor": pop_2024,
+            "tipo": "estimativa",
+            "fonte": "IBGE Estimativas da populacao residente — 1o jul/2024 (POP2024_20241230.xls)",
+        },
+        "2025": {
+            "valor": pop_2025,
+            "tipo": "estimativa",
+            "fonte": "IBGE Estimativas da populacao residente — 1o jul/2025 (POP2025_20260113.xls)",
+        },
+    }
+
+    por_ano = {}
+    for ano, info in totais.items():
+        vals = scale_faixas_largest_remainder(base, total_2022, info["valor"])
+        faixas = []
+        for f, v in zip(base, vals):
+            faixas.append({
+                "key": f["key"],
+                "label": f["label"],
+                "valor": v,
+                "pct": round(100.0 * v / info["valor"], 1) if info["valor"] else None,
+            })
+        por_ano[ano] = {
+            "total": info["valor"],
+            "tipo": info["tipo"],
+            "fonte_total": info["fonte"],
+            "faixas": faixas,
+        }
+
+    metodologia = {
+        "titulo": "Projecao das faixas educacionais 2022-2025",
+        "metodo": (
+            "Estrutura etaria constante do Censo 2022 (SIDRA 9514), "
+            "escalada pelo total populacional oficial de cada ano."
+        ),
+        "formula": "faixa_t = (faixa_2022 / pop_2022) x pop_total_t",
+        "arredondamento": "Maior resto (largest remainder), para a soma das faixas fechar no total do ano.",
+        "limitacao": (
+            "O IBGE nao publica projecao por idade no nivel municipal. "
+            "Esta serie assume que a composicao etaria de 2022 se mantem; "
+            "apenas o total acompanha as Estimativas IBGE (2024 e 2025)."
+        ),
+        "ancoras": [
+            {"ano": "2022", "total": total_2022, "fonte": totais["2022"]["fonte"]},
+            {"ano": "2023", "total": total_2022, "fonte": totais["2023"]["fonte"]},
+            {"ano": "2024", "total": pop_2024, "fonte": totais["2024"]["fonte"]},
+            {"ano": "2025", "total": pop_2025, "fonte": totais["2025"]["fonte"]},
+        ],
+        "urls": [
+            "https://sidra.ibge.gov.br/tabela/9514",
+            "https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html",
+        ],
+    }
+    return {"metodologia": metodologia, "por_ano": por_ano}
+
+
 def main():
     f_demo = os.path.join(CENSO_DIR, "Agregados_por_municipios_demografia_BR.xlsx")
     f_alf = os.path.join(CENSO_DIR, "Agregados_por_municipios_alfabetizacao_BR.xlsx")
     f_9514 = os.path.join(CENSO_DIR, "tabela9514.xlsx")
+    f_pop2024 = os.path.join(CENSO_DIR, "POP2024_20241230.xls")
+    f_pop2025 = os.path.join(CENSO_DIR, "POP2025_20260113.xls")
 
     demo = pd.read_excel(f_demo)
     demo["CD_MUN"] = demo["CD_MUN"].astype(str)
@@ -118,6 +233,9 @@ def main():
 
     ages_9514, total_9514 = load_idade_simples_9514(f_9514)
     faixas_pme = build_faixas_pme(ages_9514, total_9514)
+    pop_2024 = load_estimativa_ibge(f_pop2024)
+    pop_2025 = load_estimativa_ibge(f_pop2025)
+    projecoes_pme = build_projecoes_pme(faixas_pme, pop_2024, pop_2025)
 
     # Aproximacoes legadas (grupos quinquenais) — mantidas so para referencia
     approx = {
@@ -182,11 +300,13 @@ def main():
 
     out = {
         "metadata": {
-            "fonte": "IBGE - Censo Demografico 2022",
+            "fonte": "IBGE - Censo Demografico 2022 + Estimativas da populacao",
             "arquivos": [
                 "Agregados_por_municipios_demografia_BR.xlsx",
                 "Agregados_por_municipios_alfabetizacao_BR.xlsx",
                 "tabela9514.xlsx",
+                "POP2024_20241230.xls",
+                "POP2025_20260113.xls",
             ],
             "municipio": "Joinville",
             "uf": "SC",
@@ -195,8 +315,8 @@ def main():
             "nota_faixas": (
                 "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 "
                 "(idade simples, Resultados do Universo). "
-                "Grupos quinquenais vêm dos Agregados por Municipios. "
-                "Totais podem diferir ligeiramente entre as duas fontes."
+                "Projecoes 2023-2025: estrutura 2022 x totais oficiais IBGE. "
+                "Grupos quinquenais vêm dos Agregados por Municipios."
             ),
             "gerado_em": pd.Timestamp.now().isoformat(),
         },
@@ -206,6 +326,7 @@ def main():
             "feminino": fem,
             "faixas": faixas,
             "faixas_pme": faixas_pme,
+            "projecoes_pme": projecoes_pme,
             "aproximacoes_pme": approx,
         },
         "alfabetizacao": alfabetizacao,
@@ -217,8 +338,13 @@ def main():
     print("Salvo:", OUT)
     print("  Pop total (agregados):", pop_total)
     print("  Pop total (9514):", total_9514)
+    print("  Estimativa 2024:", pop_2024)
+    print("  Estimativa 2025:", pop_2025)
     for f in faixas_pme["faixas"]:
         print(f"  {f['label']}: {f['valor']:,} ({f['pct']}%)")
+    for ano in ["2022", "2023", "2024", "2025"]:
+        y = projecoes_pme["por_ano"][ano]
+        print(f"  [{ano}] total={y['total']:,} | 6-14={next(x['valor'] for x in y['faixas'] if x['key']=='6_14'):,}")
     print("  Alfabetizacao 15+:", alfabetizacao["taxa_alfabetizacao_15_mais"], "%")
 
 

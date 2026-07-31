@@ -9831,6 +9831,64 @@ function renderAfd() {
 
 const FONTE_CENSO_IBGE = 'Fonte: IBGE — <a href="https://www.ibge.gov.br/estatisticas/sociais/populacao/22827-censo-demografico-2022.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Censo Demográfico 2022</a> (Agregados por Municípios)';
 const FONTE_CENSO_IBGE_9514 = 'Fonte: IBGE — <a href="https://sidra.ibge.gov.br/tabela/9514" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">SIDRA Tabela 9514</a> — Censo Demográfico 2022 (idade simples, Resultados do Universo)';
+const FONTE_ESTIMATIVAS_IBGE = 'Fonte: IBGE — <a href="https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Estimativas da população residente</a> (totais 2024/2025) + estrutura etária do Censo 2022';
+
+function openMetodologiaProjecaoDemo() {
+  const proj = S.censoIbge?.populacao?.projecoes_pme;
+  const met = proj?.metodologia || {};
+  const existing = document.getElementById('demo-metodologia-overlay');
+  if (existing) existing.remove();
+
+  const ancoras = (met.ancoras || []).map(a => `
+    <tr>
+      <td><strong>${a.ano}</strong></td>
+      <td>${formatNum(a.total)}</td>
+      <td style="font-size:11px;line-height:1.4">${a.fonte || '—'}</td>
+    </tr>`).join('');
+
+  const urls = (met.urls || []).map(u =>
+    `<li><a href="${u}" target="_blank" rel="noopener">${u}</a></li>`
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'demo-metodologia-overlay';
+  overlay.className = 'conv-modal-overlay';
+  overlay.innerHTML = `
+    <div class="conv-modal" role="dialog" aria-modal="true" aria-labelledby="demo-met-title" style="max-width:720px">
+      <div class="conv-modal-header">
+        <div>
+          <div class="conv-modal-title" id="demo-met-title">${met.titulo || 'Metodologia da projeção'}</div>
+          <div class="conv-modal-sub">Rastreio das fontes e do método utilizado no painel</div>
+        </div>
+        <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="conv-modal-note" style="margin-bottom:0">
+        <p style="margin:0 0 8px"><strong>Método:</strong> ${met.metodo || '—'}</p>
+        <p style="margin:0 0 8px"><strong>Fórmula:</strong> <code style="font-size:12px">${met.formula || '—'}</code></p>
+        <p style="margin:0 0 8px"><strong>Arredondamento:</strong> ${met.arredondamento || '—'}</p>
+        <p style="margin:0"><strong>Limitação:</strong> ${met.limitacao || '—'}</p>
+      </div>
+      <div class="conv-modal-table-wrap" style="max-height:280px;padding:0 18px 8px">
+        <div style="font-size:12px;font-weight:700;color:#003866;margin:10px 0 6px">Âncoras de população total (Joinville)</div>
+        <table class="data-table conv-modal-table">
+          <thead><tr><th>Ano</th><th>Total</th><th>Fonte</th></tr></thead>
+          <tbody>${ancoras || '<tr><td colspan="3">Sem dados</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="padding:4px 18px 12px;font-size:11px;line-height:1.5;color:#444">
+        <strong>Links oficiais</strong>
+        <ul style="margin:6px 0 0;padding-left:18px">${urls || '<li>—</li>'}</ul>
+      </div>
+      <div class="conv-modal-footer">Painel de Dados Abertos — SED Joinville · Demografia</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.conv-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  document.addEventListener('keydown', function onEsc(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  });
+}
 
 function renderCensoIbge() {
   const main = document.getElementById('main-content');
@@ -9854,6 +9912,8 @@ function renderCensoIbge() {
   const faixas = pop.faixas || [];
   const faixasPme = pop.faixas_pme || {};
   const faixasPmeList = faixasPme.faixas || [];
+  const projPme = pop.projecoes_pme || {};
+  const projAnos = ['2022', '2023', '2024', '2025'].filter(a => projPme.por_ano?.[a]);
   const aprox = pop.aproximacoes_pme || {};
   const anoRef = meta.ano_referencia || 2022;
 
@@ -9881,6 +9941,36 @@ function renderCensoIbge() {
       ${faixasPme.nota || meta.nota_faixas || ''}
       ${faixasPme.total_referencia ? ` Total de referência (9514): ${formatNum(faixasPme.total_referencia)}.` : ''}
     </p>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_evolucao.png" alt=""></span>
+      <span class="section-divider-text">Projeção das faixas educacionais (2022–2025)</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="chart-title" style="margin:0">População projetada por faixa — Joinville</div>
+        <button type="button" class="map-layer-btn" id="btn-demo-metodologia" title="Ver metodologia e fontes">Metodologia e fontes</button>
+      </div>
+      <div style="overflow:auto">
+        <table class="data-table" id="censo-ibge-proj-table">
+          <thead>
+            <tr>
+              <th>Faixa etária</th>
+              ${projAnos.map(a => {
+                const tipo = projPme.por_ano[a]?.tipo;
+                const tag = tipo === 'censo' ? 'Censo' : (tipo === 'censo_fpm' ? 'Censo/FPM' : 'Estimativa');
+                return `<th style="text-align:right">${a}<br><span style="font-weight:500;font-size:9px;opacity:.75">${tag}</span></th>`;
+              }).join('')}
+              <th style="text-align:right">Var. 22–25</th>
+            </tr>
+          </thead>
+          <tbody id="censo-ibge-proj-tbody"></tbody>
+        </table>
+      </div>
+      <div class="chart-source">${FONTE_ESTIMATIVAS_IBGE}</div>
+    </div>
 
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
@@ -10023,6 +10113,48 @@ function renderCensoIbge() {
       },
     }));
   }
+
+  // Tabela de projeção 2022-2025
+  const projTbody = document.getElementById('censo-ibge-proj-tbody');
+  if (projTbody && projAnos.length && faixasPmeList.length) {
+    const keys = faixasPmeList.map(f => f.key);
+    const rowsHtml = keys.map(key => {
+      const label = faixasPmeList.find(f => f.key === key)?.label || key;
+      const vals = projAnos.map(a => {
+        const f = (projPme.por_ano[a]?.faixas || []).find(x => x.key === key);
+        return f?.valor || 0;
+      });
+      const v0 = vals[0] || 0;
+      const vN = vals[vals.length - 1] || 0;
+      const delta = vN - v0;
+      const deltaPct = v0 ? (delta / v0 * 100) : null;
+      const deltaCls = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'neutral');
+      return `<tr>
+        <td><strong>${label}</strong></td>
+        ${vals.map(v => `<td style="text-align:right">${formatNum(v)}</td>`).join('')}
+        <td style="text-align:right">
+          <span class="kpi-delta ${deltaCls}">${delta >= 0 ? '+' : ''}${formatNum(delta)}</span>
+          <span style="font-size:10px;color:#777;margin-left:4px">${deltaPct != null ? '(' + (deltaPct >= 0 ? '+' : '') + deltaPct.toFixed(1) + '%)' : ''}</span>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const totais = projAnos.map(a => projPme.por_ano[a]?.total || 0);
+    const t0 = totais[0] || 0;
+    const tN = totais[totais.length - 1] || 0;
+    const dTot = tN - t0;
+    const dPct = t0 ? (dTot / t0 * 100) : null;
+    const totRow = `<tr style="background:rgba(0,56,102,.06);font-weight:700">
+      <td>Total município</td>
+      ${totais.map(v => `<td style="text-align:right">${formatNum(v)}</td>`).join('')}
+      <td style="text-align:right">${dTot >= 0 ? '+' : ''}${formatNum(dTot)}
+        <span style="font-size:10px;color:#777;font-weight:600;margin-left:4px">${dPct != null ? '(' + (dPct >= 0 ? '+' : '') + dPct.toFixed(1) + '%)' : ''}</span>
+      </td>
+    </tr>`;
+    projTbody.innerHTML = rowsHtml + totRow;
+  }
+
+  document.getElementById('btn-demo-metodologia')?.addEventListener('click', openMetodologiaProjecaoDemo);
 
   // Chart: faixas etárias
   const faixasEl = document.getElementById('censo-ibge-chart-faixas');
