@@ -3428,6 +3428,35 @@ function bindInfraMapMetric(infra) {
 // DOCÊNCIA — STANDALONE SECTION
 // ══════════════════════════════════════════════════════════
 
+/** Aviso JV: Docência/AFD = só Dependência Municipal (escolas diretas), sem conveniadas. */
+function avisoEscolasDiretasMunicipalHTML() {
+  if (!(JV_MODE && S.redeSel === 'municipal')) return '';
+  const afdAnos = S.afd?.serie_temporal ? Object.keys(S.afd.serie_temporal).sort() : [];
+  const nDir = (afdAnos.length
+    ? (S.afd.serie_temporal[afdAnos[afdAnos.length - 1]]?.total_escolas)
+    : null)
+    || S._acessoMunicipalBase?.serie_temporal?.['2025']?.total_escolas
+    || 162;
+  const nConv = S.conveniadasSerie?.metadata?.n_ineps_lista
+    || S._escolasConveniadas?.metadata?.total_escolas
+    || S._escolasConveniadas?.escolas?.length
+    || S.conveniadasSed?.conveniadas?.length
+    || 55;
+  return `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Abrangência desta seção — escolas diretas da Dependência Municipal</div>
+      <div class="info-banner-rede-municipal-body">
+        Os indicadores desta visão consideram apenas as escolas com
+        <strong>Dependência Municipal</strong> no Censo Escolar (INEP)
+        — cerca de <strong>${formatNum(nDir)} unidades diretas</strong>.
+        <strong>Não incluem</strong> as cerca de <strong>${formatNum(nConv)} escolas conveniadas</strong>
+        (privadas no Censo e presentes na base SED), que em Acesso e Matrículas entram no recorte ampliado da rede.
+        Caso seja necessário incorporar dados de docentes ou formação das conveniadas,
+        entre em contato com a equipe técnica da SED / Painel para solicitar o levantamento.
+      </div>
+    </div>`;
+}
+
 function renderDocencia() {
   const doc = S.doc;
   const main = document.getElementById('main-content');
@@ -3441,6 +3470,8 @@ function renderDocencia() {
 
     <div class="kpi-strip" id="doc-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
     </div>
+
+    ${avisoEscolasDiretasMunicipalHTML()}
 
     <!-- ═══ Perfil Docente ═══ -->
     <div class="section-divider">
@@ -9079,6 +9110,8 @@ function renderAfd() {
       ${redeToggleHTML()}
       <div class="kpi-strip" id="afd-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
     </div>
+
+    ${avisoEscolasDiretasMunicipalHTML()}
 
     <!-- ═══ BLOCO INFORMATIVO: O que é a AFD? ═══ -->
     <div class="section-divider">
