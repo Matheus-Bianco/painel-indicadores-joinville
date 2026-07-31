@@ -462,18 +462,15 @@ body.sidebar-hidden .sidebar {
   box-sizing: border-box;
 }
 
-/* Home ocupa a área toda (larga, edge-to-edge) sem estourar */
+/* Home ocupa a área toda (larga, edge-to-edge); scroll quando o conteúdo cresce */
 body.sidebar-hidden .main-scroll {
   padding-left: 0;
   padding-right: 0;
   padding-bottom: 0;
   max-width: none;
   height: 100%;
-  overflow: hidden;
-}
-
-body.sidebar-hidden .main-scroll #main-content {
-  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ── Sticky Section Header (banner + kpi-strip) ── */
@@ -1865,11 +1862,10 @@ body.sidebar-hidden .main-scroll #main-content {
 
 .home-wrap {
   min-height: 100%;
-  height: 100%;
   background: #fff;
   position: relative;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: visible;
   border-radius: 0;
   margin: 0;
   max-width: 100%;
