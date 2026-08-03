@@ -10486,6 +10486,39 @@ function renderEnsinoSuperior() {
       <div class="chart-source">${FONTE_SUPERIOR}</div>
     </div>
 
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Oferta por curso</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:10px">
+      <div class="chart-title" id="sup-curso-top-title">Top 15 cursos por matrículas — ${anoSel}</div>
+      <div style="height:320px"><canvas id="sup-chart-cursos-top"></canvas></div>
+      <div class="chart-source">${FONTE_SUPERIOR}</div>
+    </div>
+
+    <div class="chart-card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="chart-title" style="margin:0;flex:1;min-width:180px">Cursos com oferta em Joinville — ${anoSel}</div>
+        <input type="text" class="table-search" id="sup-curso-search" placeholder="Buscar curso ou área..." style="min-width:200px">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="map-layer-btn active" data-sup-curso-mod="total">Total</button>
+          <button class="map-layer-btn" data-sup-curso-mod="presencial">Presencial</button>
+          <button class="map-layer-btn" data-sup-curso-mod="ead">EAD</button>
+        </div>
+      </div>
+      <div id="sup-curso-totals" style="font-size:11px;color:var(--text-sec);margin:0 0 8px;font-weight:600"></div>
+      <div style="overflow:auto;max-height:480px">
+        <table class="data-table" id="sup-curso-table">
+          <thead><tr id="sup-curso-thead"></tr></thead>
+          <tbody id="sup-curso-tbody"></tbody>
+          <tfoot id="sup-curso-tfoot"></tfoot>
+        </table>
+      </div>
+      <div class="chart-source">${FONTE_SUPERIOR} · Agregado por nome do curso (NO_CURSO)</div>
+    </div>
+
     <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
       ${meta.nota || 'Oferta no município de Joinville. Presencial e EAD separados.'}
       Série ${anos[0]}–${anos[anos.length - 1]}.
@@ -10765,6 +10798,198 @@ function renderEnsinoSuperior() {
       </tr>
     `).join('');
   }
+
+  // ── Oferta por curso: Top 15 + tabela pesquisável ──
+  const cursosAll = d.por_curso?.[anoSel] || [];
+  let cursoMod = S._supCursoMod || 'total';
+  if (!['total', 'presencial', 'ead'].includes(cursoMod)) cursoMod = 'total';
+  S._supCursoMod = cursoMod;
+  let cursoSort = { key: 'mat_total', dir: -1 };
+  let cursoChart = null;
+
+  const matKey = (mod) => (mod === 'presencial' ? 'mat_pres' : mod === 'ead' ? 'mat_ead' : 'mat_total');
+  const ingKey = (mod) => (mod === 'presencial' ? 'ing_pres' : mod === 'ead' ? 'ing_ead' : 'ing_total');
+  const concKey = (mod) => (mod === 'presencial' ? 'conc_pres' : mod === 'ead' ? 'conc_ead' : 'conc_total');
+  const ofKey = (mod) => (mod === 'presencial' ? 'n_ofertas_pres' : mod === 'ead' ? 'n_ofertas_ead' : 'n_ofertas');
+
+  const filterCursos = () => {
+    const q = (document.getElementById('sup-curso-search')?.value || '').trim().toLowerCase();
+    const mk = matKey(cursoMod);
+    return cursosAll.filter(c => {
+      if (cursoMod !== 'total' && !(c[mk] > 0)) return false;
+      if (!q) return true;
+      const hay = `${c.no_curso || ''} ${c.area || ''} ${c.cine_rotulo || ''} ${c.grau || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  };
+
+  const sortCursos = (rows) => {
+    const { key, dir } = cursoSort;
+    return [...rows].sort((a, b) => {
+      const av = a[key], bv = b[key];
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return dir * String(av || '').localeCompare(String(bv || ''), 'pt-BR');
+      }
+      return dir * ((av || 0) - (bv || 0));
+    });
+  };
+
+  const renderCursoTop = (rows) => {
+    const el = document.getElementById('sup-chart-cursos-top');
+    const titleEl = document.getElementById('sup-curso-top-title');
+    if (!el) return;
+    if (cursoChart) {
+      cursoChart.destroy();
+      S.charts = S.charts.filter(c => c !== cursoChart);
+      cursoChart = null;
+    }
+    const mk = matKey(cursoMod);
+    const top = [...rows].sort((a, b) => (b[mk] || 0) - (a[mk] || 0)).slice(0, 15);
+    const modLabel = cursoMod === 'presencial' ? 'Presencial' : cursoMod === 'ead' ? 'EAD' : 'Total';
+    if (titleEl) titleEl.textContent = `Top 15 cursos por matrículas (${modLabel}) — ${anoSel}`;
+    const vals = top.map(c => c[mk] || 0);
+    const maxV = Math.max(...vals, 1);
+    const barColor = SUP_MOD_COLORS[cursoMod] || SUP_MOD_COLORS.total;
+    cursoChart = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: top.map(c => c.no_curso),
+        datasets: [{
+          data: vals,
+          backgroundColor: barColor,
+          borderRadius: 2,
+          maxBarThickness: 18,
+        }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          datalabels: {
+            display: true, color: '#333',
+            font: { family: 'Inter', size: 9, weight: '600' },
+            anchor: 'end', align: 'end',
+            formatter: v => formatNumChart(v),
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true, max: Math.ceil(maxV * 1.15),
+            ticks: { callback: v => formatNumChart(v), font: { family: 'Inter', size: 9 } },
+            grid: { color: 'rgba(0,0,0,.06)' },
+          },
+          y: { ticks: { font: { family: 'Inter', size: 10 } }, grid: { display: false } },
+        },
+      },
+    });
+    S.charts.push(cursoChart);
+  };
+
+  const renderCursoTable = () => {
+    const thead = document.getElementById('sup-curso-thead');
+    const tb = document.getElementById('sup-curso-tbody');
+    const tf = document.getElementById('sup-curso-tfoot');
+    const totalsEl = document.getElementById('sup-curso-totals');
+    if (!thead || !tb) return;
+
+    const mk = matKey(cursoMod);
+    const ik = ingKey(cursoMod);
+    const ck = concKey(cursoMod);
+    const ok = ofKey(cursoMod);
+    const cols = [
+      { key: 'no_curso', label: 'Curso', align: 'left' },
+      { key: 'area', label: 'Área CINE', align: 'left' },
+      { key: 'grau', label: 'Grau', align: 'left' },
+      { key: 'n_ies', label: '#IES', num: true },
+      { key: ok, label: '#Ofertas', num: true },
+      { key: 'mat_pres', label: 'Mat. Pres.', num: true, hide: cursoMod === 'ead' },
+      { key: 'mat_ead', label: 'Mat. EAD', num: true, hide: cursoMod === 'presencial' },
+      { key: mk, label: cursoMod === 'total' ? 'Mat. Total' : 'Matrículas', num: true, bold: true },
+      { key: ik, label: 'Ingressantes', num: true },
+      { key: ck, label: 'Concluintes', num: true },
+    ].filter(c => !c.hide);
+
+    // Keep sort key valid when modality changes
+    if (!cols.some(c => c.key === cursoSort.key)) {
+      cursoSort = { key: mk, dir: -1 };
+    }
+
+    thead.innerHTML = cols.map(c => {
+      const arrow = cursoSort.key === c.key ? (cursoSort.dir < 0 ? ' ▾' : ' ▴') : '';
+      return `<th data-sort="${c.key}" style="cursor:pointer;text-align:${c.align || 'right'};white-space:nowrap">${c.label}${arrow}</th>`;
+    }).join('');
+
+    const rows = sortCursos(filterCursos());
+    tb.innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        ${cols.map(c => {
+          const v = r[c.key];
+          const txt = c.num ? formatNum(v || 0) : (v || '—');
+          const style = `text-align:${c.align || 'right'}${c.bold ? ';font-weight:700' : ''}`;
+          const title = c.key === 'no_curso' && r.cine_rotulo ? ` title="${r.cine_rotulo}"` : '';
+          return `<td style="${style}"${title}>${txt}</td>`;
+        }).join('')}
+      </tr>
+    `).join('') : `<tr><td colspan="${cols.length}" style="text-align:center;color:#999;padding:20px">Nenhum curso encontrado</td></tr>`;
+
+    const totMat = rows.reduce((s, r) => s + (r[mk] || 0), 0);
+    const totIng = rows.reduce((s, r) => s + (r[ik] || 0), 0);
+    const totConc = rows.reduce((s, r) => s + (r[ck] || 0), 0);
+    const totOf = rows.reduce((s, r) => s + (r[ok] || 0), 0);
+    const totIes = rows.reduce((s, r) => s + (r.n_ies || 0), 0);
+    const totPres = rows.reduce((s, r) => s + (r.mat_pres || 0), 0);
+    const totEad = rows.reduce((s, r) => s + (r.mat_ead || 0), 0);
+
+    if (totalsEl) {
+      totalsEl.textContent = `${formatNum(rows.length)} cursos · ${formatNum(totOf)} ofertas · Σ #IES ${formatNum(totIes)} · ${formatNum(totMat)} matrículas · ${formatNum(totIng)} ingressantes · ${formatNum(totConc)} concluintes`;
+    }
+
+    if (tf) {
+      tf.innerHTML = rows.length ? `<tr style="font-weight:700;background:#f5f7fa">
+        ${cols.map(c => {
+          let v = '';
+          if (c.key === 'no_curso') v = `Total (${formatNum(rows.length)})`;
+          else if (c.key === 'area' || c.key === 'grau') v = '';
+          else if (c.key === 'n_ies') v = formatNum(totIes);
+          else if (c.key === ok) v = formatNum(totOf);
+          else if (c.key === 'mat_pres') v = formatNum(totPres);
+          else if (c.key === 'mat_ead') v = formatNum(totEad);
+          else if (c.key === mk) v = formatNum(totMat);
+          else if (c.key === ik) v = formatNum(totIng);
+          else if (c.key === ck) v = formatNum(totConc);
+          return `<td style="text-align:${c.align || 'right'}">${v}</td>`;
+        }).join('')}
+      </tr>` : '';
+    }
+
+    thead.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const k = th.dataset.sort;
+        if (cursoSort.key === k) cursoSort.dir *= -1;
+        else cursoSort = { key: k, dir: (k === 'no_curso' || k === 'area' || k === 'grau') ? 1 : -1 };
+        refreshCursos();
+      });
+    });
+
+    renderCursoTop(rows);
+  };
+
+  const refreshCursos = () => renderCursoTable();
+
+  document.querySelectorAll('[data-sup-curso-mod]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.supCursoMod === cursoMod);
+    btn.addEventListener('click', () => {
+      cursoMod = btn.dataset.supCursoMod;
+      S._supCursoMod = cursoMod;
+      document.querySelectorAll('[data-sup-curso-mod]').forEach(b => b.classList.toggle('active', b.dataset.supCursoMod === cursoMod));
+      cursoSort = { key: matKey(cursoMod), dir: -1 };
+      refreshCursos();
+    });
+  });
+  document.getElementById('sup-curso-search')?.addEventListener('input', refreshCursos);
+  renderCursoTable();
 }
 
 // ══════════════════════════════════════════════════════════

@@ -46,15 +46,34 @@ CAT_MAP = {
     8: "Privada comunitaria",
     9: "Privada confessional",
 }
+GRAU_MAP = {
+    1: "Bacharelado",
+    2: "Licenciatura",
+    3: "Tecnologico",
+    4: "Bacharelado e Licenciatura",
+}
 
 USECOLS_CURSOS = [
     "CO_MUNICIPIO", "CO_IES", "TP_MODALIDADE_ENSINO", "TP_REDE",
     "TP_ORGANIZACAO_ACADEMICA", "TP_CATEGORIA_ADMINISTRATIVA",
+    "NO_CURSO", "CO_CURSO", "NO_CINE_AREA_GERAL", "NO_CINE_ROTULO",
+    "TP_GRAU_ACADEMICO", "TP_NIVEL_ACADEMICO",
     "QT_MAT", "QT_ING", "QT_CONC",
     "QT_MAT_FEM", "QT_MAT_MASC",
     "QT_MAT_BRANCA", "QT_MAT_PRETA", "QT_MAT_PARDA",
     "QT_MAT_AMARELA", "QT_MAT_INDIGENA", "QT_MAT_CORND",
 ]
+
+
+def _mode_str(counter):
+    """Most frequent non-empty string key in a Counter-like dict."""
+    best, best_n = "", -1
+    for k, n in counter.items():
+        if not k:
+            continue
+        if n > best_n:
+            best, best_n = k, n
+    return best
 
 
 def si(v):
@@ -133,7 +152,8 @@ def load_cursos_joinville(ano):
               "QT_MAT_BRANCA", "QT_MAT_PRETA", "QT_MAT_PARDA",
               "QT_MAT_AMARELA", "QT_MAT_INDIGENA", "QT_MAT_CORND",
               "TP_MODALIDADE_ENSINO", "TP_REDE", "TP_ORGANIZACAO_ACADEMICA",
-              "TP_CATEGORIA_ADMINISTRATIVA"]:
+              "TP_CATEGORIA_ADMINISTRATIVA", "TP_GRAU_ACADEMICO",
+              "TP_NIVEL_ACADEMICO"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
     return df
@@ -182,6 +202,7 @@ def process_ano(ano):
     }
     por_org = {}
     por_ies = {}
+    por_curso = {}  # key = NO_CURSO normalizado
 
     for _, r in cursos.iterrows():
         mod = modality_key(r.get("TP_MODALIDADE_ENSINO"))
@@ -189,6 +210,50 @@ def process_ano(ano):
             continue
         co = str(r["CO_IES"])
         m, i, c = si(r.get("QT_MAT")), si(r.get("QT_ING")), si(r.get("QT_CONC"))
+
+        # por curso (agregado por nome)
+        raw_nome = r.get("NO_CURSO")
+        nome = str(raw_nome).strip() if pd.notna(raw_nome) and str(raw_nome).strip() else "Sem nome"
+        if nome not in por_curso:
+            por_curso[nome] = {
+                "no_curso": nome,
+                "area": "",
+                "cine_rotulo": "",
+                "grau": "",
+                "mat_pres": 0, "mat_ead": 0, "mat_total": 0,
+                "ing_pres": 0, "ing_ead": 0, "ing_total": 0,
+                "conc_pres": 0, "conc_ead": 0, "conc_total": 0,
+                "n_ofertas": 0, "n_ofertas_pres": 0, "n_ofertas_ead": 0,
+                "_ies": set(),
+                "_area_c": {},
+                "_cine_c": {},
+                "_grau_c": {},
+            }
+        pc = por_curso[nome]
+        pc["n_ofertas"] += 1
+        pc["_ies"].add(co)
+        if mod == "presencial":
+            pc["mat_pres"] += m
+            pc["ing_pres"] += i
+            pc["conc_pres"] += c
+            pc["n_ofertas_pres"] += 1
+        else:
+            pc["mat_ead"] += m
+            pc["ing_ead"] += i
+            pc["conc_ead"] += c
+            pc["n_ofertas_ead"] += 1
+        pc["mat_total"] += m
+        pc["ing_total"] += i
+        pc["conc_total"] += c
+        area = str(r.get("NO_CINE_AREA_GERAL") or "").strip() if pd.notna(r.get("NO_CINE_AREA_GERAL")) else ""
+        cine = str(r.get("NO_CINE_ROTULO") or "").strip() if pd.notna(r.get("NO_CINE_ROTULO")) else ""
+        grau = GRAU_MAP.get(si(r.get("TP_GRAU_ACADEMICO")), "")
+        if area:
+            pc["_area_c"][area] = pc["_area_c"].get(area, 0) + 1
+        if cine:
+            pc["_cine_c"][cine] = pc["_cine_c"].get(cine, 0) + 1
+        if grau:
+            pc["_grau_c"][grau] = pc["_grau_c"].get(grau, 0) + 1
 
         add_mod(mat, mod, m)
         add_mod(ing, mod, i)
@@ -269,6 +334,29 @@ def process_ano(ano):
 
     por_ies_list = sorted(por_ies.values(), key=lambda x: -x["mat_total"])
 
+    por_curso_list = []
+    for pc in por_curso.values():
+        por_curso_list.append({
+            "no_curso": pc["no_curso"],
+            "area": _mode_str(pc["_area_c"]),
+            "cine_rotulo": _mode_str(pc["_cine_c"]),
+            "grau": _mode_str(pc["_grau_c"]),
+            "mat_pres": pc["mat_pres"],
+            "mat_ead": pc["mat_ead"],
+            "mat_total": pc["mat_total"],
+            "ing_pres": pc["ing_pres"],
+            "ing_ead": pc["ing_ead"],
+            "ing_total": pc["ing_total"],
+            "conc_pres": pc["conc_pres"],
+            "conc_ead": pc["conc_ead"],
+            "conc_total": pc["conc_total"],
+            "n_ies": len(pc["_ies"]),
+            "n_ofertas": pc["n_ofertas"],
+            "n_ofertas_pres": pc["n_ofertas_pres"],
+            "n_ofertas_ead": pc["n_ofertas_ead"],
+        })
+    por_curso_list.sort(key=lambda x: -x["mat_total"])
+
     serie = {
         "ies_oferta": len(ies_por_mod["total"]),
         "ies_oferta_presencial": len(ies_por_mod["presencial"]),
@@ -286,6 +374,7 @@ def process_ano(ano):
         "por_rede": por_rede,
         "por_org": por_org,
         "por_ies": por_ies_list,
+        "por_curso": por_curso_list,
         "ies_sede": ies_sede,
     }
 
@@ -297,6 +386,7 @@ def main():
     por_rede = {}
     por_org_academica = {}
     por_ies = {}
+    por_curso = {}
     ies_sede_latest = []
 
     for ano in ANOS:
@@ -313,10 +403,12 @@ def main():
         por_rede[y] = out["por_rede"]
         por_org_academica[y] = out["por_org"]
         por_ies[y] = out["por_ies"]
+        por_curso[y] = out["por_curso"]
         ies_sede_latest = out["ies_sede"]
         s = out["serie"]
         print(
             f"  [{ano}] IES oferta={s['ies_oferta']} sede={s['ies_sede']} "
+            f"cursos_nome={len(out['por_curso'])} "
             f"MAT total={s['mat']['total']:,} pres={s['mat']['presencial']:,} ead={s['mat']['ead']:,}"
         )
 
@@ -332,7 +424,8 @@ def main():
             "nota": (
                 "Inclui polos/EAD de IES sediadas fora do municipio. "
                 "Presencial e EAD sempre separados. "
-                "ies_sede = instituicoes com reitoria/sede em Joinville."
+                "ies_sede = instituicoes com reitoria/sede em Joinville. "
+                "por_curso = agregado por NO_CURSO (nome do curso)."
             ),
         },
         "serie_temporal": serie_temporal,
@@ -340,6 +433,7 @@ def main():
         "por_rede": por_rede,
         "por_org_academica": por_org_academica,
         "por_ies": por_ies,
+        "por_curso": por_curso,
         "ies_sede": ies_sede_latest,
     }
 
