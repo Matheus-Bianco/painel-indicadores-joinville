@@ -3498,6 +3498,7 @@ function renderDocencia() {
       <div class="chart-card d3">
         <div class="chart-title">Tipo de Vínculo${geoSuffix()}</div>
         <div style="height:240px"><canvas id="chart-doc-vinculo"></canvas></div>
+        <div id="doc-vinculo-nota" style="font-size:10px;color:#555;line-height:1.45;padding:6px 2px 0;border-top:1px dashed rgba(0,0,0,.08);margin-top:6px"></div>
         <div class="chart-source">${FONTE_CENSO}</div>
       </div>
     </div>
@@ -4027,9 +4028,31 @@ function buildDocCharts(doc) {
   doughnut('chart-doc-sexo', p.por_sexo, ['#E91E63CC', '#1976D2CC']);
   // Ordem esperada: Branca, Preta, Parda, Amarela, Indigena, Nao Declarada (QT_DOC_BAS_ND)
   doughnut('chart-doc-raca', p.por_raca, ['#1976D2CC', '#333333CC', '#8D6E63CC', '#FFB300CC', '#2E7D32CC', '#9E9E9ECC']);
-  // Filter out Terceirizado and CLT from vinculo
-  const filteredVinculo = p.por_vinculo ? Object.fromEntries(Object.entries(p.por_vinculo).filter(([k]) => k !== 'Terceirizado' && k !== 'CLT')) : null;
-  doughnut('chart-doc-vinculo', filteredVinculo, ['#2E7D32CC','#E65100CC']);
+
+  // Vínculo: 4 categorias oficiais do Inep (escola pública) — Concursado, Contrato temporário, Terceirizado, CLT
+  const vinculoOrder = ['Concursado', 'Contratado', 'Terceirizado', 'CLT'];
+  const vinculoColors = {
+    Concursado: '#2E7D32CC',
+    Contratado: '#E65100CC',
+    Terceirizado: '#6A1B9ACC',
+    CLT: '#455A64CC',
+  };
+  const vinculoData = p.por_vinculo
+    ? Object.fromEntries(vinculoOrder.filter(k => (p.por_vinculo[k] || 0) > 0).map(k => [k, p.por_vinculo[k]]))
+    : null;
+  doughnut('chart-doc-vinculo', vinculoData, vinculoData ? Object.keys(vinculoData).map(k => vinculoColors[k]) : []);
+  const vinculoNotaEl = document.getElementById('doc-vinculo-nota');
+  if (vinculoNotaEl && vinculoData) {
+    const sumVinc = Object.values(vinculoData).reduce((a, b) => a + b, 0);
+    const totDoc = p.total || docTotal || 0;
+    const delta = sumVinc - totDoc;
+    const deltaTxt = delta === 0
+      ? 'A soma das categorias coincide com o total de docentes.'
+      : `A soma das categorias (${formatNum(sumVinc)}) difere em ${delta > 0 ? '+' : ''}${formatNum(delta)} do total de docentes (${formatNum(totDoc)}) — inconsistência residual da tabela agregada do Inep em algumas escolas.`;
+    vinculoNotaEl.innerHTML = `
+      <strong>Nota:</strong> Categorias do Censo (escola pública): Concursado/efetivo, Contrato temporário, Terceirizado e CLT.
+      ${deltaTxt}`;
+  }
 
   // Bar for escolaridade
   const escoEl = document.getElementById('chart-doc-esco');
