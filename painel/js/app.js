@@ -42,6 +42,7 @@ const S = {
   inse: null,
   icg: null,       // 4_8_icg.json — Complexidade de Gestão
   afd: null,       // 4_9_afd.json — Adequação da Formação Docente
+  ied: null,       // 4_13_ied.json — Indicador de Esforço Docente
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
   ensinoSuperior: null, // 4_12_ensino_superior.json — Censo da Educação Superior
@@ -120,7 +121,7 @@ const REDE_LABELS = JV_MODE ? {
 };
 
 /** Views com JSON multi-dependência em Joinville */
-const JV_MULTI_REDE_VIEWS = new Set(['acesso', 'infra', 'docencia', 'afd']);
+const JV_MULTI_REDE_VIEWS = new Set(['acesso', 'infra', 'docencia', 'afd', 'ied']);
 
 /** Subtítulo geográfico das seções */
 function sectionSubtitle() {
@@ -284,6 +285,7 @@ function getExportSource() {
     inse: 'INEP — Indicador de Nível Socioeconômico (INSE/SAEB)',
     icg: 'INEP — Indicador de Complexidade de Gestão da Escola',
     afd: 'INEP — Indicador de Adequação da Formação Docente',
+    ied: 'INEP — Indicador de Esforço Docente',
     tdi: 'INEP — Indicador de Distorção Idade-Série',
     'censo-ibge': 'IBGE — Censo Demográfico 2022',
     saers: 'SAERS/CAED — Avaliação do Estado do Rio Grande do Sul',
@@ -865,7 +867,7 @@ async function loadRedeData(rede) {
     && (!JV_MODE || S.redeCache[rede]?.escolas);
   if (cacheOk) return S.redeCache[rede];
   // Fetch all data sources in parallel; 404s handled gracefully
-  const keys = ['acesso', 'infra', 'fluxo', 'saeb', 'inse', 'icg', 'afd', 'ideb', 'tdi', 'saers', 'saersEscolas', 'docentes', 'escolas'];
+  const keys = ['acesso', 'infra', 'fluxo', 'saeb', 'inse', 'icg', 'afd', 'ied', 'ideb', 'tdi', 'saers', 'saersEscolas', 'docentes', 'escolas'];
   const urls = [
     `dados/4_1_acesso_${rede}.json`,
     `dados/4_5_infra_${rede}.json`,
@@ -874,6 +876,7 @@ async function loadRedeData(rede) {
     `dados/4_7_inse_${rede}.json`,
     `dados/4_8_icg_${rede}.json`,
     `dados/4_9_afd_${rede}.json`,
+    `dados/4_13_ied_${rede}.json`,
     `dados/4_7_ideb_${rede}.json`,
     `dados/4_10_tdi_${rede}.json`,
     `dados/4_saers_${rede}.json`,
@@ -951,10 +954,11 @@ async function switchRede(rede) {
     // Re-populate municipality dropdown
     populateMunDropdown(S.creSel);
     if (JV_MODE) {
-      // Multi-dependência: Acesso / Infra / Docência / AFD (recorte Joinville)
+      // Multi-dependência: Acesso / Infra / Docência / AFD / IED (recorte Joinville)
       if (cached.infra) S.infra = cached.infra;
       if (cached.docentes) S.doc = cached.docentes;
       if (cached.afd) S.afd = cached.afd;
+      if (cached.ied) S.ied = cached.ied;
       // Mapa/tabela territorial: trocar escolas da dependencia selecionada
       S.escolasData = cached.escolas || { escolas: [], metadata: { rede, total_escolas: 0 } };
       if (rede === 'municipal') {
@@ -971,6 +975,7 @@ async function switchRede(rede) {
       S.inse  = cached.inse;
       S.icg   = cached.icg;
       S.afd   = cached.afd;
+      S.ied   = cached.ied;
       S.ideb  = cached.ideb;
       S.tdi   = cached.tdi;
       S.saersData = cached.saers;
@@ -6081,6 +6086,7 @@ function renderHome() {
     { view: 'inse', icon: 'img/icons/nav_desigualdades.png', title: 'Contexto Socioeconômico', desc: 'Indicador INSE por escola e município' },
     { view: 'docencia', icon: 'img/icons/sec_docentes.png', title: 'Docência', desc: 'Perfil, vínculo e distribuição docente' },
     { view: 'afd', icon: 'img/icons/professor.png', title: 'Formação Docente', desc: 'Adequação da formação por etapa' },
+    { view: 'ied', icon: 'img/icons/sec_docentes.png', title: 'Esforço Docente', desc: 'Distribuição dos docentes por níveis de esforço (IED/INEP)' },
     { view: 'fluxo', icon: 'img/icons/sec_evolucao.png', title: 'Fluxo e Rendimento', desc: 'Aprovação, reprovação e abandono' },
     { view: 'tdi', icon: 'img/icons/politicas.png', title: 'Distorção Idade-Série', desc: 'Taxa de defasagem escolar por etapa' },
     { view: 'saeb', icon: 'img/icons/sec_saeb.png', title: 'SAEB', desc: 'Proficiência em Língua Portuguesa e Matemática' },
@@ -9184,6 +9190,265 @@ function renderIcg() {
 }
 
 // ══════════════════════════════════════════════════════════
+// ESFORÇO DOCENTE (IED)
+// ══════════════════════════════════════════════════════════
+
+const FONTE_IED = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/indicadores-educacionais/esforco-docente" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Indicador de Esforço Docente</a> · Nota Técnica nº 039/2014';
+
+const IED_NIVEIS = [
+  { key: 'n1', label: 'Nível 1', short: 'N1', color: '#2E7D32' },
+  { key: 'n2', label: 'Nível 2', short: 'N2', color: '#66BB6A' },
+  { key: 'n3', label: 'Nível 3', short: 'N3', color: '#FFCB04' },
+  { key: 'n4', label: 'Nível 4', short: 'N4', color: '#FB8C00' },
+  { key: 'n5', label: 'Nível 5', short: 'N5', color: '#E65100' },
+  { key: 'n6', label: 'Nível 6', short: 'N6', color: '#C62828' },
+];
+
+const IED_ETAPAS = [
+  { key: 'fund_total', label: 'Fundamental (Total)', short: 'Fund. Total', elevRule: 'N5+N6' },
+  { key: 'fund_ai', label: 'Anos Iniciais', short: 'Anos Iniciais', elevRule: 'N5+N6' },
+  { key: 'fund_af', label: 'Anos Finais', short: 'Anos Finais', elevRule: 'N6' },
+  { key: 'medio', label: 'Ensino Médio', short: 'Médio', elevRule: 'N6' },
+];
+
+function renderIed() {
+  const main = document.getElementById('main-content');
+  destroyCharts(); destroyMap();
+
+  const ied = S.ied;
+  const iedToggleDisabled = ['filantropica'];
+  const iedToggleMsg = 'O IED do INEP agrega a rede privada como "Privada" (sem separar Particular e Filantrópica). Use o botão Particular.';
+
+  if (!ied || !ied.serie_temporal) {
+    main.innerHTML = `
+      <div class="section-sticky">
+        ${sectionBanner('img/icons/sec_docentes.png', 'Esforço Docente (IED)', sectionSubtitle())}
+        ${redeToggleHTML(iedToggleDisabled, iedToggleMsg)}
+      </div>
+      <div style="text-align:center;padding:60px 20px;color:var(--text-sec);">
+        <p style="font-size:1.1rem;font-weight:600;">Dados de Esforço Docente não disponíveis para a ${getRedeLabel()}</p>
+      </div>`;
+    bindRedeToggle();
+    return;
+  }
+
+  const anos = Object.keys(ied.serie_temporal).sort();
+  const anoSel = (S.anoSel && ied.serie_temporal[S.anoSel]) ? S.anoSel : anos[anos.length - 1];
+  S.anoSel = anoSel;
+  const st = ied.serie_temporal[anoSel] || {};
+  const meta = ied.metadata || {};
+  const hasMedio = !!(st.medio && IED_NIVEIS.some(n => st.medio[n.key] != null));
+
+  const elevAI = st.fund_ai?.elevado;
+  const elevAF = st.fund_af?.elevado;
+  const elevEM = st.medio?.elevado;
+  const elevFund = st.fund_total?.elevado;
+  const n1AI = st.fund_ai?.n1;
+
+  main.innerHTML = `
+    <div class="section-sticky">
+      ${sectionBanner('img/icons/sec_docentes.png', 'Esforço Docente (IED)', sectionSubtitle())}
+      ${redeToggleHTML(iedToggleDisabled, iedToggleMsg)}
+      <div class="kpi-strip" id="ied-kpis" style="grid-template-columns:repeat(${hasMedio ? 4 : 3},1fr)"></div>
+    </div>
+
+    ${avisoEscolasDiretasMunicipalHTML()}
+
+    <div style="background:rgba(25,118,210,.06);border-left:3px solid #1976D2;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#333;line-height:1.5">
+      <strong>O que é o IED:</strong> escala de 6 níveis (TRI) que sintetiza o esforço do docente com base em
+      número de escolas, turnos, etapas e alunos atendidos (Censo Escolar).
+      <strong>Esforço elevado</strong> — Anos Iniciais: níveis 5 e 6; Anos Finais e Médio: apenas nível 6
+      (Nota Técnica Inep nº 039/2014). Valores em % de docentes na etapa.
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Distribuição por nível — ${anoSel}</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Percentual de docentes por nível de esforço e etapa</div>
+      <div style="height:300px"><canvas id="ied-chart-niveis"></canvas></div>
+      <div class="chart-source">${FONTE_IED}</div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_evolucao.png" alt=""></span>
+      <span class="section-divider-text">Evolução do esforço elevado</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">% de docentes em esforço elevado (${anos[0]}–${anoSel})</div>
+      <div style="height:260px"><canvas id="ied-chart-evol"></canvas></div>
+      <div class="chart-source">${FONTE_IED}</div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/politicas.png" alt=""></span>
+      <span class="section-divider-text">Descrição dos níveis</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card">
+      <div style="overflow:auto">
+        <table class="data-table" id="ied-niveis-table">
+          <thead><tr>
+            <th>Nível</th><th>Perfil típico (Nota Técnica)</th>
+            <th>Fund. Total</th><th>Anos Iniciais</th><th>Anos Finais</th>
+            ${hasMedio ? '<th>Ensino Médio</th>' : ''}
+          </tr></thead>
+          <tbody id="ied-niveis-tbody"></tbody>
+        </table>
+      </div>
+      <div class="chart-source">${FONTE_IED}</div>
+    </div>
+
+    <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
+      ${meta.regra_elevado || ''} ${meta.nota || ''}
+      Série ${anos[0]}–${anos[anos.length - 1]} · Joinville/SC.
+    </p>
+  `;
+
+  const selAno = document.getElementById('sel-ano');
+  if (selAno) {
+    selAno.innerHTML = anos.map(a => `<option value="${a}" ${a === anoSel ? 'selected' : ''}>${a}</option>`).join('');
+  }
+  bindTopbarFilters();
+  bindRedeToggle();
+
+  // KPIs
+  const strip = document.getElementById('ied-kpis');
+  if (strip) {
+    const kpis = [
+      { label: `% Elevado AI (${anoSel})`, value: elevAI != null ? elevAI.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevAI || 0) > 15 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
+      { label: `% Elevado AF (${anoSel})`, value: elevAF != null ? elevAF.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevAF || 0) > 10 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
+      ...(hasMedio
+        ? [{ label: `% Elevado Médio (${anoSel})`, value: elevEM != null ? elevEM.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevEM || 0) > 10 ? 'red' : 'green', icon: 'img/icons/medio.png' }]
+        : [{ label: `% Elevado Fund. (${anoSel})`, value: elevFund != null ? elevFund.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevFund || 0) > 15 ? 'red' : 'green', icon: 'img/icons/fundamental.png' }]),
+      { label: `% Nível 1 AI (${anoSel})`, value: n1AI != null ? n1AI.toFixed(1) + '%' : '—', note: 'Menor esforço', accent: 'blue', icon: 'img/icons/professor.png' },
+    ];
+    strip.innerHTML = kpis.map((k, i) => `
+      <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 70}ms">
+        <div class="kpi-top">
+          <span class="kpi-label">${k.label}</span>
+          <img class="kpi-icon" src="${k.icon}" alt="">
+        </div>
+        <div class="kpi-body"><span class="kpi-value">${k.value}</span></div>
+        <div class="kpi-footer"><span class="kpi-abs">${k.note || ''}</span></div>
+      </div>`).join('');
+  }
+
+  // Chart: grouped bars by etapa × nível
+  const nivEl = document.getElementById('ied-chart-niveis');
+  if (nivEl) {
+    const etapasChart = IED_ETAPAS.filter(e => st[e.key] && (e.key !== 'medio' || hasMedio));
+    S.charts.push(new Chart(nivEl, {
+      type: 'bar',
+      data: {
+        labels: etapasChart.map(e => e.short),
+        datasets: IED_NIVEIS.map(n => ({
+          label: n.short,
+          data: etapasChart.map(e => st[e.key]?.[n.key] ?? 0),
+          backgroundColor: n.color + 'CC',
+          borderColor: n.color,
+          borderWidth: 0.5,
+          borderRadius: 2,
+          maxBarThickness: 28,
+        })),
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 10 }, usePointStyle: true } },
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] >= 8,
+            color: '#333', font: { family: 'Inter', size: 8, weight: '700' },
+            anchor: 'end', align: 'top',
+            formatter: v => v.toFixed(0) + '%',
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10, weight: '600' } } },
+          y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%', font: { family: 'Inter', size: 9 } }, grid: { color: 'rgba(0,0,0,.06)' } },
+        },
+      },
+    }));
+  }
+
+  // Evolution of elevado
+  const evolEl = document.getElementById('ied-chart-evol');
+  if (evolEl) {
+    const series = [
+      { key: 'fund_ai', label: 'Anos Iniciais (N5+N6)', color: COLORS.pri },
+      { key: 'fund_af', label: 'Anos Finais (N6)', color: '#F57C00' },
+      ...(hasMedio || anos.some(a => ied.serie_temporal[a]?.medio) ? [{ key: 'medio', label: 'Ensino Médio (N6)', color: COLORS.red }] : []),
+    ];
+    const datasets = series.map(s => ({
+      label: s.label,
+      data: anos.map(a => ied.serie_temporal[a]?.[s.key]?.elevado ?? null),
+      borderColor: s.color,
+      backgroundColor: s.color,
+      tension: 0.25,
+      pointRadius: 3,
+      borderWidth: 2,
+      spanGaps: true,
+    }));
+    const maxV = Math.max(...datasets.flatMap(d => d.data.filter(v => v != null)), 1);
+    S.charts.push(new Chart(evolEl, {
+      type: 'line',
+      data: { labels: anos, datasets },
+      options: {
+        ...CHART_DEFAULTS,
+        layout: { padding: { top: 18 } },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
+          datalabels: { ...DL_LINE, formatter: v => (v != null ? v.toFixed(1) + '%' : '') },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { ...CHART_DEFAULTS.scales.y, suggestedMax: maxV * 1.25, ticks: { callback: v => v + '%' } },
+        },
+      },
+    }));
+  }
+
+  // Table
+  const tbody = document.getElementById('ied-niveis-tbody');
+  if (tbody) {
+    const desc = meta.niveis || {};
+    tbody.innerHTML = IED_NIVEIS.map(n => {
+      const idx = n.key.replace('n', '');
+      const etapasCols = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])];
+      const cells = etapasCols.map(ek => {
+        const v = st[ek]?.[n.key];
+        return `<td style="text-align:right;font-weight:${(n.key === 'n5' || n.key === 'n6') ? '700' : '500'}">${v != null ? v.toFixed(1) + '%' : '—'}</td>`;
+      }).join('');
+      return `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${n.color};margin-right:6px;vertical-align:middle"></span><strong>${n.label}</strong></td>
+        <td style="font-size:10px;color:#555">${desc[idx] || '—'}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+    // footer elevado
+    const elevRow = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])].map(ek => {
+      const et = IED_ETAPAS.find(e => e.key === ek);
+      const v = st[ek]?.elevado;
+      return `<td style="text-align:right;font-weight:700">${v != null ? v.toFixed(1) + '%' : '—'}<div style="font-size:9px;font-weight:500;color:#888">${et?.elevRule || ''}</div></td>`;
+    }).join('');
+    tbody.innerHTML += `<tr style="background:#f5f7fa">
+      <td colspan="2"><strong>Esforço elevado</strong></td>
+      ${elevRow}
+    </tr>`;
+  }
+
+  injectExportButtons();
+}
+
+// ══════════════════════════════════════════════════════════
 // ADEQUAÇÃO DA FORMAÇÃO DOCENTE (AFD)
 // ══════════════════════════════════════════════════════════
 
@@ -11996,6 +12261,7 @@ function initNav() {
       else if (view === 'inse') { renderInse(); }
       else if (view === 'icg') { renderIcg(); }
       else if (view === 'afd') { renderAfd(); }
+      else if (view === 'ied') { renderIed(); }
       else if (view === 'tdi') { renderTdi(); }
       else if (view === 'desigualdades' && S.desig) { renderDesigualdades(); }
       else if (view === 'escolas') { renderEscolas(); }
@@ -13203,6 +13469,7 @@ function refreshActiveTab() {
   else if (view === 'inse') renderInse();
   else if (view === 'icg') renderIcg();
   else if (view === 'afd') renderAfd();
+  else if (view === 'ied') renderIed();
   else if (view === 'tdi') renderTdi();
   else if (view === 'desigualdades' && S.desig) renderDesigualdades();
   else if (view === 'escolas') renderEscolas();
@@ -16130,6 +16397,9 @@ const EXTRACAO_DATASETS = [
   { id: 'afd', icon: 'img/icons/professor.png', title: 'Formação Docente (AFD)',
     desc: 'Adequação da formação docente por etapa, com detalhamento por escola.',
     fonte: 'INEP — Indicador de Adequação da Formação Docente', file: 'dados/4_9_afd.json', state: 'afd' },
+  { id: 'ied', icon: 'img/icons/sec_docentes.png', title: 'Esforço Docente (IED)',
+    desc: 'Percentual de docentes por níveis de esforço (escolas, turnos, etapas e alunos).',
+    fonte: 'INEP — Indicador de Esforço Docente', file: 'dados/4_13_ied.json', state: 'ied' },
   { id: 'fluxo', icon: 'img/icons/sec_evolucao.png', title: 'Fluxo e Rendimento',
     desc: 'Taxas de aprovação, reprovação e abandono (município e por escola).',
     fonte: 'INEP — Indicadores de Rendimento Escolar', file: 'dados/4_3_fluxo_rendimento.json', state: 'fluxo' },
@@ -16339,7 +16609,7 @@ async function init() {
   try {
     const cb = '?_cb=' + Date.now();
     if (JV_MODE) {
-      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv, respConvSerie, respSup] = await Promise.all([
+      const [respData, respGeo, respInfra, respDoc, respFtl, respSaeb, respFluxo, respInse, respIcg, respAfd, respIed, respIdeb, respTdi, respEscolas, respCensoIbge, respEscConv, respConvSerie, respSup] = await Promise.all([
         fetch('dados/4_1_acesso_matriculas.json' + cb),
         fetch(JV.geoFile + cb),
         fetch('dados/4_5_infraestrutura.json' + cb),
@@ -16350,6 +16620,7 @@ async function init() {
         fetch('dados/4_7_inse.json' + cb),
         fetch('dados/4_8_icg.json' + cb),
         fetch('dados/4_9_afd.json' + cb),
+        fetch('dados/4_13_ied.json' + cb),
         fetch('dados/4_7_ideb.json' + cb),
         fetch('dados/4_10_tdi.json' + cb),
         fetch('dados/escolas_municipais.json' + cb),
@@ -16373,6 +16644,9 @@ async function init() {
       if (respInse.ok) S.inse = await respInse.json();
       if (respIcg.ok) S.icg = await respIcg.json();
       if (respAfd.ok) S.afd = await respAfd.json();
+      if (respIed.ok) {
+        try { S.ied = await respIed.json(); } catch (e) { console.warn('ied', e); }
+      }
       if (respIdeb.ok) S.ideb = await respIdeb.json();
       if (respTdi.ok) S.tdi = await respTdi.json();
       if (respEscolas.ok) S.escolasData = await respEscolas.json();
@@ -16389,7 +16663,7 @@ async function init() {
       S.redeCache.municipal = {
         acessoBase: S._acessoMunicipalBase,
         acesso: S.data, infra: S.infra, fluxo: S.fluxo, saeb: S.saeb,
-        inse: S.inse, icg: S.icg, afd: S.afd, ideb: S.ideb, tdi: S.tdi,
+        inse: S.inse, icg: S.icg, afd: S.afd, ied: S.ied, ideb: S.ideb, tdi: S.tdi,
         saers: null, saersEscolas: null, docentes: S.doc,
         escolas: S.escolasData,
       };
