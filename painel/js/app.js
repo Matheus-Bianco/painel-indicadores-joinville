@@ -9205,11 +9205,35 @@ const IED_NIVEIS = [
 ];
 
 const IED_ETAPAS = [
-  { key: 'fund_total', label: 'Fundamental (Total)', short: 'Fund. Total', elevRule: 'N5+N6' },
-  { key: 'fund_ai', label: 'Anos Iniciais', short: 'Anos Iniciais', elevRule: 'N5+N6' },
-  { key: 'fund_af', label: 'Anos Finais', short: 'Anos Finais', elevRule: 'N6' },
-  { key: 'medio', label: 'Ensino Médio', short: 'Médio', elevRule: 'N6' },
+  { key: 'fund_total', label: 'Fundamental (Total)', short: 'Fund. Total', elevRule: 'N5+N6', denomKey: null },
+  { key: 'fund_ai', label: 'Anos Iniciais', short: 'Anos Iniciais', elevRule: 'N5+N6', denomKey: 'Fund. AI' },
+  { key: 'fund_af', label: 'Anos Finais', short: 'Anos Finais', elevRule: 'N6', denomKey: 'Fund. AF' },
+  { key: 'medio', label: 'Ensino Médio', short: 'Médio', elevRule: 'N6', denomKey: 'Medio' },
 ];
+
+/** Denominadores do Censo (QT_DOC por etapa) — o IED municipal do Inep só publica %. */
+function iedDenomMap(ano) {
+  const row = S.doc?.serie_temporal_total?.[ano];
+  if (!row) return {};
+  return {
+    fund_ai: row['Fund. AI'] || 0,
+    fund_af: row['Fund. AF'] || 0,
+    medio: row['Medio'] || 0,
+    // Fund. Total: sem N único no Censo (AI+AF tem sobreposição) — sem absoluto
+    fund_total: null,
+  };
+}
+
+function iedAbs(pct, denom) {
+  if (pct == null || denom == null || denom <= 0) return null;
+  return Math.round(pct * denom / 100);
+}
+
+function iedAbsTip(pct, denom) {
+  const n = iedAbs(pct, denom);
+  if (n == null) return '';
+  return `≈ ${formatNum(n)} de ${formatNum(denom)} docentes (estimativa Censo)`;
+}
 
 function renderIed() {
   const main = document.getElementById('main-content');
@@ -9239,6 +9263,8 @@ function renderIed() {
   const meta = ied.metadata || {};
   const hasMedio = !!(st.medio && IED_NIVEIS.some(n => st.medio[n.key] != null));
   const etapasCols = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])];
+  const denomAno = iedDenomMap(anoSel);
+  const hasDenom = !!(denomAno.fund_ai || denomAno.fund_af || denomAno.medio);
 
   const elevAI = st.fund_ai?.elevado;
   const elevAF = st.fund_af?.elevado;
@@ -9268,6 +9294,10 @@ function renderIed() {
       Os valores do painel são o <strong>% de funções docentes</strong> da etapa em cada nível / em esforço elevado.</p>
       <p style="margin:6px 0 0;color:#555">Os perfis da tabela abaixo são tipologias ilustrativas da Nota Técnica (faixas típicas de alunos, turnos, escolas e etapas),
       não critérios rígidos de classificação individual — a alocação no nível vem do escore TRI.</p>
+      <p style="margin:6px 0 0"><strong>Números absolutos:</strong> o arquivo municipal do Inep traz apenas percentuais.
+      Nos <em>pop-ups</em> (passar o mouse nos gráficos, KPIs e células da tabela) exibimos uma
+      <strong>estimativa</strong> ≈ % × docentes da etapa no Censo Escolar (QT_DOC). Pode diferir levemente do universo exato do IED.
+      Fund. Total não tem absoluto (sobreposição AI/AF no Censo).</p>
     </div>
 
     <div class="section-divider">
@@ -9336,19 +9366,23 @@ function renderIed() {
   bindTopbarFilters();
   bindRedeToggle();
 
-  // KPIs — sempre 4 cards em uma linha
+  // KPIs — sempre 4 cards em uma linha; absoluto no title (popup nativo)
   const strip = document.getElementById('ied-kpis');
   if (strip) {
+    const kpiAbsNote = (pct, ek, regra) => {
+      const n = iedAbs(pct, denomAno[ek]);
+      return n != null ? `${regra} · ≈${formatNum(n)}` : regra;
+    };
     const kpis = [
-      { label: `% Elevado AI (${anoSel})`, value: elevAI != null ? elevAI.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevAI || 0) > 15 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
-      { label: `% Elevado AF (${anoSel})`, value: elevAF != null ? elevAF.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevAF || 0) > 10 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
-      { label: `% Elevado Fund. (${anoSel})`, value: elevFund != null ? elevFund.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevFund || 0) > 15 ? 'red' : 'green', icon: 'img/icons/fundamental.png' },
+      { label: `% Elevado AI (${anoSel})`, value: elevAI != null ? elevAI.toFixed(1) + '%' : '—', note: kpiAbsNote(elevAI, 'fund_ai', 'Níveis 5+6'), tip: iedAbsTip(elevAI, denomAno.fund_ai) || 'Níveis 5+6', accent: (elevAI || 0) > 15 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
+      { label: `% Elevado AF (${anoSel})`, value: elevAF != null ? elevAF.toFixed(1) + '%' : '—', note: kpiAbsNote(elevAF, 'fund_af', 'Nível 6'), tip: iedAbsTip(elevAF, denomAno.fund_af) || 'Nível 6', accent: (elevAF || 0) > 10 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
+      { label: `% Elevado Fund. (${anoSel})`, value: elevFund != null ? elevFund.toFixed(1) + '%' : '—', note: 'Níveis 5+6', tip: 'Sem absoluto: Fund. Total não tem denominador único no Censo (sobreposição AI/AF).', accent: (elevFund || 0) > 15 ? 'red' : 'green', icon: 'img/icons/fundamental.png' },
       ...(hasMedio
-        ? [{ label: `% Elevado Médio (${anoSel})`, value: elevEM != null ? elevEM.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevEM || 0) > 10 ? 'red' : 'green', icon: 'img/icons/medio.png' }]
-        : [{ label: `% Nível 1 AI (${anoSel})`, value: st.fund_ai?.n1 != null ? st.fund_ai.n1.toFixed(1) + '%' : '—', note: 'Menor esforço', accent: 'blue', icon: 'img/icons/professor.png' }]),
+        ? [{ label: `% Elevado Médio (${anoSel})`, value: elevEM != null ? elevEM.toFixed(1) + '%' : '—', note: kpiAbsNote(elevEM, 'medio', 'Nível 6'), tip: iedAbsTip(elevEM, denomAno.medio) || 'Nível 6', accent: (elevEM || 0) > 10 ? 'red' : 'green', icon: 'img/icons/medio.png' }]
+        : [{ label: `% Nível 1 AI (${anoSel})`, value: st.fund_ai?.n1 != null ? st.fund_ai.n1.toFixed(1) + '%' : '—', note: kpiAbsNote(st.fund_ai?.n1, 'fund_ai', 'Menor esforço'), tip: iedAbsTip(st.fund_ai?.n1, denomAno.fund_ai) || 'Menor esforço', accent: 'blue', icon: 'img/icons/professor.png' }]),
     ];
     strip.innerHTML = kpis.map((k, i) => `
-      <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 70}ms">
+      <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 70}ms;cursor:help" title="${(k.tip || k.note || '').replace(/"/g, '&quot;')}">
         <div class="kpi-top">
           <span class="kpi-label">${k.label}</span>
           <img class="kpi-icon" src="${k.icon}" alt="">
@@ -9374,6 +9408,7 @@ function renderIed() {
           borderWidth: 0.5,
           borderRadius: 2,
           maxBarThickness: 28,
+          _etapasKeys: etapasChart.map(e => e.key),
         })),
       },
       options: {
@@ -9386,6 +9421,20 @@ function renderIed() {
             color: '#333', font: { family: 'Inter', size: 8, weight: '700' },
             anchor: 'end', align: 'top',
             formatter: v => v.toFixed(0) + '%',
+          },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              title: items => items[0]?.label || '',
+              label: ctx => {
+                const pct = ctx.parsed.y;
+                const ek = ctx.dataset._etapasKeys?.[ctx.dataIndex];
+                const tip = iedAbsTip(pct, denomAno[ek]);
+                return tip
+                  ? ` ${ctx.dataset.label}: ${pct.toFixed(1)}%  (${tip})`
+                  : ` ${ctx.dataset.label}: ${pct != null ? pct.toFixed(1) + '%' : '—'}`;
+              },
+            },
           },
         },
         scales: {
@@ -9406,6 +9455,7 @@ function renderIed() {
     ];
     const datasets = series.map(s => ({
       label: s.label,
+      etapaKey: s.key,
       data: anos.map(a => ied.serie_temporal[a]?.[s.key]?.elevado ?? null),
       borderColor: s.color,
       backgroundColor: s.color,
@@ -9425,6 +9475,20 @@ function renderIed() {
           ...CHART_DEFAULTS.plugins,
           legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, usePointStyle: true } },
           datalabels: { ...DL_LINE, formatter: v => (v != null ? v.toFixed(1) + '%' : '') },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              title: items => items[0]?.label || '',
+              label: ctx => {
+                const pct = ctx.parsed.y;
+                const ano = anos[ctx.dataIndex];
+                const tip = iedAbsTip(pct, iedDenomMap(ano)[ctx.dataset.etapaKey]);
+                return tip
+                  ? ` ${ctx.dataset.label}: ${pct.toFixed(1)}%  (${tip})`
+                  : ` ${ctx.dataset.label}: ${pct != null ? pct.toFixed(1) + '%' : '—'}`;
+              },
+            },
+          },
         },
         scales: {
           ...CHART_DEFAULTS.scales,
@@ -9434,15 +9498,17 @@ function renderIed() {
     }));
   }
 
-  // Table — colunas numéricas com largura fixa e alinhamento à direita
+  // Table — % visível; absoluto no title (hover)
   const tbody = document.getElementById('ied-niveis-tbody');
   if (tbody) {
-    const numTd = 'text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums';
+    const numTd = 'text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;cursor:help';
     tbody.innerHTML = IED_NIVEIS.map(n => {
       const cells = etapasCols.map(ek => {
         const v = st[ek]?.[n.key];
         const heavy = (n.key === 'n5' || n.key === 'n6');
-        return `<td style="${numTd};font-weight:${heavy ? '700' : '500'}">${v != null ? v.toFixed(1) + '%' : '—'}</td>`;
+        const tip = iedAbsTip(v, denomAno[ek]);
+        const title = tip || (ek === 'fund_total' ? 'Sem absoluto (Fund. Total sem denominador único no Censo)' : '');
+        return `<td style="${numTd};font-weight:${heavy ? '700' : '500'}" title="${title.replace(/"/g, '&quot;')}">${v != null ? v.toFixed(1) + '%' : '—'}</td>`;
       }).join('');
       return `<tr${n.key === 'n5' || n.key === 'n6' ? ' style="background:rgba(230,81,0,.04)"' : ''}>
         <td style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${n.color};margin-right:6px;vertical-align:middle"></span><strong>${n.label}</strong></td>
@@ -9453,10 +9519,12 @@ function renderIed() {
     const elevRow = etapasCols.map(ek => {
       const et = IED_ETAPAS.find(e => e.key === ek);
       const v = st[ek]?.elevado;
-      return `<td style="${numTd};font-weight:700">${v != null ? v.toFixed(1) + '%' : '—'}<div style="font-size:9px;font-weight:500;color:#888">${et?.elevRule || ''}</div></td>`;
+      const tip = iedAbsTip(v, denomAno[ek]);
+      const title = tip || (ek === 'fund_total' ? 'Sem absoluto (Fund. Total sem denominador único no Censo)' : '');
+      return `<td style="${numTd};font-weight:700" title="${title.replace(/"/g, '&quot;')}">${v != null ? v.toFixed(1) + '%' : '—'}<div style="font-size:9px;font-weight:500;color:#888">${et?.elevRule || ''}</div></td>`;
     }).join('');
     tbody.innerHTML += `<tr style="background:#f5f7fa">
-      <td colspan="2"><strong>Esforço elevado</strong></td>
+      <td colspan="2"><strong>Esforço elevado</strong>${hasDenom ? ' <span style="font-size:9px;font-weight:500;color:#888">(passe o mouse nas % para ver ≈ docentes)</span>' : ''}</td>
       ${elevRow}
     </tr>`;
   }
