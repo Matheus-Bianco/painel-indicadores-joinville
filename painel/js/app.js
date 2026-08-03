@@ -9196,12 +9196,12 @@ function renderIcg() {
 const FONTE_IED = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/indicadores-educacionais/esforco-docente" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">Indicador de Esforço Docente</a> · Nota Técnica nº 039/2014';
 
 const IED_NIVEIS = [
-  { key: 'n1', label: 'Nível 1', short: 'N1', color: '#2E7D32' },
-  { key: 'n2', label: 'Nível 2', short: 'N2', color: '#66BB6A' },
-  { key: 'n3', label: 'Nível 3', short: 'N3', color: '#FFCB04' },
-  { key: 'n4', label: 'Nível 4', short: 'N4', color: '#FB8C00' },
-  { key: 'n5', label: 'Nível 5', short: 'N5', color: '#E65100' },
-  { key: 'n6', label: 'Nível 6', short: 'N6', color: '#C62828' },
+  { key: 'n1', label: 'Nível 1', short: 'N1', color: '#2E7D32', desc: 'Até 25 alunos; 1 turno, 1 escola, 1 etapa' },
+  { key: 'n2', label: 'Nível 2', short: 'N2', color: '#66BB6A', desc: '25 a 150 alunos; 1 turno, 1 escola, 1 etapa' },
+  { key: 'n3', label: 'Nível 3', short: 'N3', color: '#FFCB04', desc: '25 a 300 alunos; 1 ou 2 turnos; 1 escola e 1 etapa' },
+  { key: 'n4', label: 'Nível 4', short: 'N4', color: '#FB8C00', desc: '50 a 400 alunos; 2 turnos; 1–2 escolas; 2 etapas' },
+  { key: 'n5', label: 'Nível 5', short: 'N5', color: '#E65100', desc: 'Mais de 300 alunos; 3 turnos; 2–3 escolas; 2–3 etapas' },
+  { key: 'n6', label: 'Nível 6', short: 'N6', color: '#C62828', desc: 'Mais de 400 alunos; 3 turnos; 2–3 escolas; 2–3 etapas' },
 ];
 
 const IED_ETAPAS = [
@@ -9238,27 +9238,36 @@ function renderIed() {
   const st = ied.serie_temporal[anoSel] || {};
   const meta = ied.metadata || {};
   const hasMedio = !!(st.medio && IED_NIVEIS.some(n => st.medio[n.key] != null));
+  const etapasCols = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])];
 
   const elevAI = st.fund_ai?.elevado;
   const elevAF = st.fund_af?.elevado;
   const elevEM = st.medio?.elevado;
   const elevFund = st.fund_total?.elevado;
-  const n1AI = st.fund_ai?.n1;
 
   main.innerHTML = `
     <div class="section-sticky">
       ${sectionBanner('img/icons/sec_docentes.png', 'Esforço Docente (IED)', sectionSubtitle())}
       ${redeToggleHTML(iedToggleDisabled, iedToggleMsg)}
-      <div class="kpi-strip" id="ied-kpis" style="grid-template-columns:repeat(${hasMedio ? 4 : 3},1fr)"></div>
+      <div class="kpi-strip" id="ied-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
     </div>
 
     ${avisoEscolasDiretasMunicipalHTML()}
 
-    <div style="background:rgba(25,118,210,.06);border-left:3px solid #1976D2;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#333;line-height:1.5">
-      <strong>O que é o IED:</strong> escala de 6 níveis (TRI) que sintetiza o esforço do docente com base em
-      número de escolas, turnos, etapas e alunos atendidos (Censo Escolar).
-      <strong>Esforço elevado</strong> — Anos Iniciais: níveis 5 e 6; Anos Finais e Médio: apenas nível 6
-      (Nota Técnica Inep nº 039/2014). Valores em % de docentes na etapa.
+    <div style="background:rgba(25,118,210,.06);border-left:3px solid #1976D2;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#333;line-height:1.55">
+      <strong style="color:#1565C0">O que é o Indicador de Esforço Docente (IED)</strong>
+      <p style="margin:6px 0 0">Desenvolvido pelo Inep (Nota Técnica nº 039/2014; atualização Nota CGCQTI/DEED nº 09/2016), o IED estima o
+      <em>esforço</em> demandado ao docente a partir de quatro dimensões observadas no Censo Escolar:
+      <strong>número de escolas</strong> em que leciona, <strong>número de turnos</strong> de trabalho,
+      <strong>número de etapas</strong> atendidas e <strong>número de alunos</strong>.
+      Como o esforço em si não é observado diretamente, o Inep usa um modelo de <strong>Teoria de Resposta ao Item (TRI)</strong>
+      para posicionar cada função docente em uma escala latente de 6 níveis (N1 = menor esforço → N6 = maior).</p>
+      <p style="margin:6px 0 0"><strong>Esforço elevado</strong> (indicador-síntese do Inep):
+      nos <strong>Anos Iniciais</strong>, soma dos níveis 5 e 6; nos <strong>Anos Finais</strong> e no
+      <strong>Ensino Médio</strong>, apenas o nível 6 (o Inep considera que, nessas etapas, o limiar de esforço crítico é mais alto).
+      Os valores do painel são o <strong>% de funções docentes</strong> da etapa em cada nível / em esforço elevado.</p>
+      <p style="margin:6px 0 0;color:#555">Os perfis da tabela abaixo são tipologias ilustrativas da Nota Técnica (faixas típicas de alunos, turnos, escolas e etapas),
+      não critérios rígidos de classificação individual — a alocação no nível vem do escore TRI.</p>
     </div>
 
     <div class="section-divider">
@@ -9293,11 +9302,19 @@ function renderIed() {
 
     <div class="chart-card">
       <div style="overflow:auto">
-        <table class="data-table" id="ied-niveis-table">
+        <table class="data-table" id="ied-niveis-table" style="table-layout:fixed;width:100%">
+          <colgroup>
+            <col style="width:110px">
+            <col>
+            ${etapasCols.map(() => '<col style="width:96px">').join('')}
+          </colgroup>
           <thead><tr>
-            <th>Nível</th><th>Perfil típico (Nota Técnica)</th>
-            <th>Fund. Total</th><th>Anos Iniciais</th><th>Anos Finais</th>
-            ${hasMedio ? '<th>Ensino Médio</th>' : ''}
+            <th style="text-align:left">Nível</th>
+            <th style="text-align:left">Perfil típico (Nota Técnica)</th>
+            <th style="text-align:right">Fund. Total</th>
+            <th style="text-align:right">Anos Iniciais</th>
+            <th style="text-align:right">Anos Finais</th>
+            ${hasMedio ? '<th style="text-align:right">Ensino Médio</th>' : ''}
           </tr></thead>
           <tbody id="ied-niveis-tbody"></tbody>
         </table>
@@ -9306,8 +9323,9 @@ function renderIed() {
     </div>
 
     <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
-      ${meta.regra_elevado || ''} ${meta.nota || ''}
-      Série ${anos[0]}–${anos[anos.length - 1]} · Joinville/SC.
+      Anos Iniciais: esforço elevado = % nos níveis 5 e 6. Anos Finais e Ensino Médio: esforço elevado = % no nível 6.
+      Fundamental Total: referência com soma dos níveis 5 e 6. Percentuais de funções docentes (Censo Escolar).
+      Série ${anos[0]}–${anos[anos.length - 1]} · Joinville/SC · ${meta.nota_tecnica || 'Nota Técnica nº 039/2014'}.
     </p>
   `;
 
@@ -9318,16 +9336,16 @@ function renderIed() {
   bindTopbarFilters();
   bindRedeToggle();
 
-  // KPIs
+  // KPIs — sempre 4 cards em uma linha
   const strip = document.getElementById('ied-kpis');
   if (strip) {
     const kpis = [
       { label: `% Elevado AI (${anoSel})`, value: elevAI != null ? elevAI.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevAI || 0) > 15 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
       { label: `% Elevado AF (${anoSel})`, value: elevAF != null ? elevAF.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevAF || 0) > 10 ? 'red' : 'green', icon: 'img/icons/sec_docentes.png' },
+      { label: `% Elevado Fund. (${anoSel})`, value: elevFund != null ? elevFund.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevFund || 0) > 15 ? 'red' : 'green', icon: 'img/icons/fundamental.png' },
       ...(hasMedio
         ? [{ label: `% Elevado Médio (${anoSel})`, value: elevEM != null ? elevEM.toFixed(1) + '%' : '—', note: 'Nível 6', accent: (elevEM || 0) > 10 ? 'red' : 'green', icon: 'img/icons/medio.png' }]
-        : [{ label: `% Elevado Fund. (${anoSel})`, value: elevFund != null ? elevFund.toFixed(1) + '%' : '—', note: 'Níveis 5+6', accent: (elevFund || 0) > 15 ? 'red' : 'green', icon: 'img/icons/fundamental.png' }]),
-      { label: `% Nível 1 AI (${anoSel})`, value: n1AI != null ? n1AI.toFixed(1) + '%' : '—', note: 'Menor esforço', accent: 'blue', icon: 'img/icons/professor.png' },
+        : [{ label: `% Nível 1 AI (${anoSel})`, value: st.fund_ai?.n1 != null ? st.fund_ai.n1.toFixed(1) + '%' : '—', note: 'Menor esforço', accent: 'blue', icon: 'img/icons/professor.png' }]),
     ];
     strip.innerHTML = kpis.map((k, i) => `
       <div class="kpi-card accent-${k.accent}" style="animation-delay:${i * 70}ms">
@@ -9416,28 +9434,26 @@ function renderIed() {
     }));
   }
 
-  // Table
+  // Table — colunas numéricas com largura fixa e alinhamento à direita
   const tbody = document.getElementById('ied-niveis-tbody');
   if (tbody) {
-    const desc = meta.niveis || {};
+    const numTd = 'text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums';
     tbody.innerHTML = IED_NIVEIS.map(n => {
-      const idx = n.key.replace('n', '');
-      const etapasCols = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])];
       const cells = etapasCols.map(ek => {
         const v = st[ek]?.[n.key];
-        return `<td style="text-align:right;font-weight:${(n.key === 'n5' || n.key === 'n6') ? '700' : '500'}">${v != null ? v.toFixed(1) + '%' : '—'}</td>`;
+        const heavy = (n.key === 'n5' || n.key === 'n6');
+        return `<td style="${numTd};font-weight:${heavy ? '700' : '500'}">${v != null ? v.toFixed(1) + '%' : '—'}</td>`;
       }).join('');
-      return `<tr>
-        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${n.color};margin-right:6px;vertical-align:middle"></span><strong>${n.label}</strong></td>
-        <td style="font-size:10px;color:#555">${desc[idx] || '—'}</td>
+      return `<tr${n.key === 'n5' || n.key === 'n6' ? ' style="background:rgba(230,81,0,.04)"' : ''}>
+        <td style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${n.color};margin-right:6px;vertical-align:middle"></span><strong>${n.label}</strong></td>
+        <td style="font-size:10px;color:#555;line-height:1.35">${n.desc}</td>
         ${cells}
       </tr>`;
     }).join('');
-    // footer elevado
-    const elevRow = ['fund_total', 'fund_ai', 'fund_af', ...(hasMedio ? ['medio'] : [])].map(ek => {
+    const elevRow = etapasCols.map(ek => {
       const et = IED_ETAPAS.find(e => e.key === ek);
       const v = st[ek]?.elevado;
-      return `<td style="text-align:right;font-weight:700">${v != null ? v.toFixed(1) + '%' : '—'}<div style="font-size:9px;font-weight:500;color:#888">${et?.elevRule || ''}</div></td>`;
+      return `<td style="${numTd};font-weight:700">${v != null ? v.toFixed(1) + '%' : '—'}<div style="font-size:9px;font-weight:500;color:#888">${et?.elevRule || ''}</div></td>`;
     }).join('');
     tbody.innerHTML += `<tr style="background:#f5f7fa">
       <td colspan="2"><strong>Esforço elevado</strong></td>
