@@ -9354,7 +9354,7 @@ function renderIed() {
 
     <p style="font-size:9.5px;color:#999;margin:12px 0 4px;line-height:1.5;font-style:italic">
       Anos Iniciais: esforço elevado = % nos níveis 5 e 6. Anos Finais e Ensino Médio: esforço elevado = % no nível 6.
-      Fundamental Total: referência com soma dos níveis 5 e 6. Percentuais de funções docentes (Censo Escolar).
+      Fundamental Total: referência com soma dos níveis 5 e 6. Percentuais oficiais do Inep; absolutos nos pop-ups são estimativa (% × QT_DOC da etapa no Censo).
       Série ${anos[0]}–${anos[anos.length - 1]} · Joinville/SC · ${meta.nota_tecnica || 'Nota Técnica nº 039/2014'}.
     </p>
   `;
