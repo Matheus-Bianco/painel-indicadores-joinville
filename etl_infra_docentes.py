@@ -393,7 +393,8 @@ def etl_docentes():
     f_esc = os.path.join(MICRO_DIR, "Tabela_Escola_2025.csv")
     
     h_esc = pd.read_csv(f_esc, sep=";", encoding="latin-1", nrows=0)
-    use_esc = [c for c in id_cols if c in h_esc.columns]
+    esc_extra = ["NO_ENTIDADE", "NO_BAIRRO", "TP_LOCALIZACAO"]
+    use_esc = [c for c in id_cols + esc_extra if c in h_esc.columns]
     df_esc = pd.read_csv(f_esc, sep=";", encoding="latin-1", usecols=use_esc)
     df_esc = df_esc[(df_esc["CO_MUNICIPIO"] == CO_MUN_JOINVILLE) & (df_esc["TP_SITUACAO_FUNCIONAMENTO"] == 1)]
     if 'TP_CATEGORIA_ESCOLA_PRIVADA' in df_esc.columns:
@@ -437,6 +438,7 @@ def etl_docentes():
             "serie_temporal_municipio": {},
             "perfil_2025": {},
             "por_municipio_2025": {},
+            "escolas_2025": [],
             "razao_aluno_professor": {},
             "lookup_municipios": lookup
         }
@@ -498,6 +500,27 @@ def etl_docentes():
                                 label = DOC_LABELS.get(c, c)
                                 mun_entry[group_name][label] = safe_int(grp[c].sum())
                 resultado["por_municipio_2025"][cod_str] = mun_entry
+
+            # Lista de escolas do universo 2025 (para banner/modal na Docência)
+            escolas_list = []
+            for _, r in df_25.iterrows():
+                inep = str(int(r["CO_ENTIDADE"])) if pd.notna(r.get("CO_ENTIDADE")) else ""
+                nome = str(r["NO_ENTIDADE"]).strip() if "NO_ENTIDADE" in df_25.columns and pd.notna(r.get("NO_ENTIDADE")) else inep
+                bairro = str(r["NO_BAIRRO"]).strip() if "NO_BAIRRO" in df_25.columns and pd.notna(r.get("NO_BAIRRO")) else ""
+                doc_n = safe_int(r.get("QT_DOC_BAS")) if "QT_DOC_BAS" in df_25.columns else 0
+                mat_n = safe_int(r.get("QT_MAT_BAS")) if "QT_MAT_BAS" in df_25.columns else 0
+                escolas_list.append({
+                    "inep": inep,
+                    "nome": nome,
+                    "bairro": bairro,
+                    "docentes": doc_n,
+                    "matriculas": mat_n,
+                    "razao": round(mat_n / doc_n, 1) if doc_n > 0 and mat_n > 0 else None,
+                })
+            escolas_list.sort(key=lambda x: (-x["docentes"], x["nome"]))
+            resultado["escolas_2025"] = escolas_list
+            resultado["metadata"]["n_escolas_2025"] = len(escolas_list)
+            resultado["metadata"]["docentes_2025"] = doc_total_25
 
         out = os.path.join(OUT_DIR, f"4_5_docentes_{rede_key}.json")
         with open(out, "w", encoding="utf-8") as f:

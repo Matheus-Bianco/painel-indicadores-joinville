@@ -3437,12 +3437,16 @@ function avisoEscolasDiretasMunicipalHTML() {
     ? (S.afd.serie_temporal[afdAnos[afdAnos.length - 1]]?.total_escolas)
     : null)
     || S._acessoMunicipalBase?.serie_temporal?.['2025']?.total_escolas
+    || S.doc?.escolas_2025?.length
     || 162;
   const nConv = S.conveniadasSerie?.metadata?.n_ineps_lista
     || S._escolasConveniadas?.metadata?.total_escolas
     || S._escolasConveniadas?.escolas?.length
     || S.conveniadasSed?.conveniadas?.length
     || 55;
+  const listaBtn = (S.doc?.escolas_2025?.length)
+    ? ` <button type="button" class="map-layer-btn" id="btn-doc-universo-escolas" style="margin-left:6px;vertical-align:middle">Ver lista (${formatNum(S.doc.escolas_2025.length)})</button>`
+    : '';
   return `
     <div class="info-banner-rede-municipal" role="note">
       <div class="info-banner-rede-municipal-title">Abrangência desta seção — escolas diretas da Dependência Municipal</div>
@@ -3453,8 +3457,100 @@ function avisoEscolasDiretasMunicipalHTML() {
         <strong>Não incluem</strong> as cerca de <strong>${formatNum(nConv)} escolas conveniadas</strong>
         (privadas no Censo e presentes na base SED), que em Acesso e Matrículas entram no recorte ampliado da rede.
         Caso seja necessário incorporar dados de docentes ou formação das conveniadas, solicite o levantamento.
+        ${listaBtn}
       </div>
     </div>`;
+}
+
+/** Banner de universo escolar na Docência para dependências não municipais (JV). */
+function avisoUniversoDocenciaHTML() {
+  if (!JV_MODE || S.redeSel === 'municipal') return '';
+  const lista = S.doc?.escolas_2025 || [];
+  const nEsc = lista.length || S.doc?.por_municipio_2025?.[JV.munCod]?.escolas || 0;
+  const nDoc = S.doc?.perfil_2025?.total
+    || S.doc?.serie_temporal_total?.['2025']?.QT_DOC_BAS
+    || 0;
+  const label = REDE_LABELS[S.redeSel] || S.redeSel;
+  if (!nEsc && !lista.length) return '';
+  return `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Universo desta visão — ${label}</div>
+      <div class="info-banner-rede-municipal-body">
+        Indicadores do Censo Escolar 2025 para escolas com
+        <strong>Dependência ${label}</strong> em Joinville:
+        <strong>${formatNum(nEsc)} escolas</strong>
+        e <strong>${formatNum(nDoc)} docentes</strong>.
+        <button type="button" class="map-layer-btn" id="btn-doc-universo-escolas" style="margin-left:6px;vertical-align:middle">
+          Ver escolas (${formatNum(nEsc)})
+        </button>
+      </div>
+    </div>`;
+}
+
+/** Modal com a lista de escolas do universo Docência (escolas_2025). */
+function openDocEscolasUniversoModal() {
+  const lista = S.doc?.escolas_2025 || [];
+  if (!lista.length) return;
+  const label = REDE_LABELS[S.redeSel] || S.redeSel;
+  const existing = document.getElementById('doc-universo-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'doc-universo-modal-overlay';
+  overlay.className = 'conv-modal-overlay';
+  overlay.innerHTML = `
+    <div class="conv-modal" role="dialog" aria-modal="true" aria-labelledby="doc-universo-modal-title">
+      <div class="conv-modal-header">
+        <div>
+          <div class="conv-modal-title" id="doc-universo-modal-title">Escolas no universo — ${label}</div>
+          <div class="conv-modal-sub">${formatNum(lista.length)} escolas · ${formatNum(lista.reduce((s, e) => s + (e.docentes || 0), 0))} docentes (Censo 2025)</div>
+        </div>
+        <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="conv-modal-note">
+        Escolas em funcionamento em Joinville com a dependência administrativa selecionada
+        e registro na Tabela de Docentes do Censo Escolar 2025 (INEP).
+      </div>
+      <div class="conv-modal-search-wrap">
+        <input type="text" id="doc-universo-search" class="conv-modal-search" placeholder="Buscar por nome, INEP ou bairro...">
+      </div>
+      <div class="conv-modal-table-wrap">
+        <table class="data-table conv-modal-table">
+          <thead><tr>
+            <th>#</th><th>Escola</th><th>INEP</th><th>Bairro</th><th>Docentes</th><th>Matrículas</th><th>A/P</th>
+          </tr></thead>
+          <tbody>
+            ${lista.map((e, i) => `
+              <tr data-q="${String(e.nome || '').toLowerCase()} ${e.inep || ''} ${String(e.bairro || '').toLowerCase()}">
+                <td>${i + 1}</td>
+                <td><strong>${e.nome || '—'}</strong></td>
+                <td>${e.inep || '—'}</td>
+                <td>${e.bairro || '—'}</td>
+                <td>${formatNum(e.docentes || 0)}</td>
+                <td>${formatNum(e.matriculas || 0)}</td>
+                <td>${e.razao != null ? e.razao.toFixed(1) : '—'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="conv-modal-footer">Fonte: INEP — Censo Escolar 2025 (Tabela Escola × Tabela Docente)</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.conv-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  const search = overlay.querySelector('#doc-universo-search');
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    overlay.querySelectorAll('tbody tr').forEach(tr => {
+      tr.style.display = (!q || tr.dataset.q.includes(q)) ? '' : 'none';
+    });
+  });
+  document.addEventListener('keydown', function onEsc(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  });
+  setTimeout(() => search.focus(), 50);
 }
 
 function renderDocencia() {
@@ -3472,6 +3568,7 @@ function renderDocencia() {
     </div>
 
     ${avisoEscolasDiretasMunicipalHTML()}
+    ${avisoUniversoDocenciaHTML()}
 
     <!-- ═══ Perfil Docente ═══ -->
     <div class="section-divider">
@@ -3481,7 +3578,7 @@ function renderDocencia() {
     </div>
 
     <div style="background:rgba(25,118,210,.06);border-left:3px solid #1976D2;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#333;line-height:1.5">
-      <strong>ℹ️ Nota:</strong> Os recortes de sexo, raça/cor, escolaridade, faixa etária e vínculo são extraídos da <em>Tabela de Docentes</em> do Censo Escolar, publicada pelo INEP apenas a partir da edição de <strong>2025</strong>. Dessa forma, estes perfis não variam de ano para ano e representam exclusivamente o retrato de 2025.
+      <strong>Nota:</strong> Os recortes de sexo, raça/cor, escolaridade, faixa etária e vínculo são extraídos da <em>Tabela de Docentes</em> do Censo Escolar, publicada pelo INEP apenas a partir da edição de <strong>2025</strong>. Dessa forma, estes perfis não variam de ano para ano e representam exclusivamente o retrato de 2025.
     </div>
 
     <div class="charts-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
@@ -3584,6 +3681,8 @@ function renderDocencia() {
     buildDocMunTable(doc);
   }
 
+  document.getElementById('btn-doc-universo-escolas')?.addEventListener('click', openDocEscolasUniversoModal);
+
   // Populate dropdowns
   const anos = Object.keys(doc.serie_temporal_total || {}).sort();
   const anoSel = S.anoSel || anos[anos.length - 1] || '2025';
@@ -3624,6 +3723,41 @@ function renderDocencia() {
   });
 }
 
+/** Une escolas_2025 do JSON de docentes com coordenadas de S.escolasData (quando houver). */
+function escolasDocenciaUniverso(doc) {
+  const listaDoc = doc?.escolas_2025 || [];
+  const ed = S.escolasData?.escolas || [];
+  const byInep = new Map(ed.map(e => [String(e.inep), e]));
+  if (listaDoc.length) {
+    return listaDoc.map(d => {
+      const geo = byInep.get(String(d.inep)) || {};
+      return {
+        ...geo,
+        inep: d.inep,
+        nome: d.nome || geo.nome,
+        municipio: geo.municipio || JV.munNome || 'Joinville',
+        cod_mun: geo.cod_mun || JV.munCod,
+        bairro: d.bairro || geo.bairro || '',
+        lat: geo.lat,
+        lng: geo.lng,
+        doc_total: d.docentes,
+        mat_total: d.matriculas,
+        doc_fem: geo.doc_fem,
+        doc_sup: geo.doc_sup,
+        doc_licen: geo.doc_licen,
+        doc_concur: geo.doc_concur,
+        doc_contrat: geo.doc_contrat,
+        doc_fund_ai: geo.doc_fund_ai,
+        doc_fund_af: geo.doc_fund_af,
+        doc_medio: geo.doc_medio,
+        doc_eja: geo.doc_eja,
+      };
+    });
+  }
+  // Fallback: arquivo de escolas já com doc_total (ex.: municipal)
+  return ed.filter(e => e.doc_total != null);
+}
+
 /* ── Docência Escola Layer ── */
 function buildDocEscolaLayer(doc) {
   const mapEl = document.getElementById('doc-map');
@@ -3636,9 +3770,8 @@ function buildDocEscolaLayer(doc) {
     maxZoom: 18, attribution: '&copy; CARTO'
   }).addTo(S.map);
 
-  const ed = S.escolasData;
-  if (!ed || !ed.escolas) return;
-  const escolas = S.creSel ? ed.escolas.filter(e => e.cre === S.creSel) : ed.escolas;
+  let escolas = escolasDocenciaUniverso(doc);
+  if (S.creSel) escolas = escolas.filter(e => e.cre === S.creSel);
   const withCoords = escolas.filter(e => e.lat && e.lng && e.doc_total != null);
   const lookup = S.data?.lookup_municipios || {};
 
