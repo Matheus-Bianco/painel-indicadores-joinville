@@ -140,9 +140,10 @@ COLS_SALAS = ["QT_SALAS_UTILIZADAS", "QT_SALAS_UTILIZA_CLIMATIZADAS"]
 
 DOC_COLS_PERFIL = {
     "total": "QT_DOC_BAS",
-    "por_sexo": ["QT_DOC_BAS_FEM","QT_DOC_BAS_MASC","QT_DOC_BAS_ND"],
-    "por_raca": ["QT_DOC_BAS_BRANCA","QT_DOC_BAS_PRETA","QT_DOC_BAS_PARDA",
-                 "QT_DOC_BAS_AMARELA","QT_DOC_BAS_INDIGENA"],
+    # QT_DOC_BAS_ND = Cor/Raca Nao Declarada (dicionario Inep) — NAO e sexo
+    "por_sexo": ["QT_DOC_BAS_FEM", "QT_DOC_BAS_MASC"],
+    "por_raca": ["QT_DOC_BAS_BRANCA", "QT_DOC_BAS_PRETA", "QT_DOC_BAS_PARDA",
+                 "QT_DOC_BAS_AMARELA", "QT_DOC_BAS_INDIGENA", "QT_DOC_BAS_ND"],
     "por_faixa_etaria": ["QT_DOC_BAS_0_24","QT_DOC_BAS_25_29","QT_DOC_BAS_30_39",
                          "QT_DOC_BAS_40_49","QT_DOC_BAS_50_54","QT_DOC_BAS_55_59","QT_DOC_BAS_60_MAIS"],
     "por_escolaridade": ["QT_DOC_BAS_ESCO_EF","QT_DOC_BAS_ESCO_EM",
@@ -156,9 +157,10 @@ DOC_COLS_PERFIL = {
 }
 
 DOC_LABELS = {
-    "QT_DOC_BAS_FEM": "Feminino", "QT_DOC_BAS_MASC": "Masculino", "QT_DOC_BAS_ND": "Nao Declarado",
+    "QT_DOC_BAS_FEM": "Feminino", "QT_DOC_BAS_MASC": "Masculino",
     "QT_DOC_BAS_BRANCA": "Branca", "QT_DOC_BAS_PRETA": "Preta", "QT_DOC_BAS_PARDA": "Parda",
     "QT_DOC_BAS_AMARELA": "Amarela", "QT_DOC_BAS_INDIGENA": "Indigena",
+    "QT_DOC_BAS_ND": "Nao Declarada",
     "QT_DOC_BAS_0_24": "Ate 24", "QT_DOC_BAS_25_29": "25-29", "QT_DOC_BAS_30_39": "30-39",
     "QT_DOC_BAS_40_49": "40-49", "QT_DOC_BAS_50_54": "50-54", "QT_DOC_BAS_55_59": "55-59",
     "QT_DOC_BAS_60_MAIS": "60+",

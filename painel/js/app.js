@@ -4024,8 +4024,9 @@ function buildDocCharts(doc) {
     }));
   };
 
-  doughnut('chart-doc-sexo', p.por_sexo, ['#E91E63CC','#1976D2CC','#9E9E9ECC']);
-  doughnut('chart-doc-raca', p.por_raca, ['#1976D2CC','#333333CC','#8D6E63CC','#FFB300CC','#2E7D32CC']);
+  doughnut('chart-doc-sexo', p.por_sexo, ['#E91E63CC', '#1976D2CC']);
+  // Ordem esperada: Branca, Preta, Parda, Amarela, Indigena, Nao Declarada (QT_DOC_BAS_ND)
+  doughnut('chart-doc-raca', p.por_raca, ['#1976D2CC', '#333333CC', '#8D6E63CC', '#FFB300CC', '#2E7D32CC', '#9E9E9ECC']);
   // Filter out Terceirizado and CLT from vinculo
   const filteredVinculo = p.por_vinculo ? Object.fromEntries(Object.entries(p.por_vinculo).filter(([k]) => k !== 'Terceirizado' && k !== 'CLT')) : null;
   doughnut('chart-doc-vinculo', filteredVinculo, ['#2E7D32CC','#E65100CC']);
