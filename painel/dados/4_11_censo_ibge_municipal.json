@@ -12,8 +12,8 @@
     "uf": "SC",
     "co_municipio": "4209102",
     "ano_referencia": 2022,
-    "nota_faixas": "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 (idade simples, Resultados do Universo). Projecoes 2023-2025: estrutura 2022 x totais oficiais IBGE. Grupos quinquenais vêm dos Agregados por Municipios.",
-    "gerado_em": "2026-07-31T10:15:38.951297"
+    "nota_faixas": "Faixas educacionais (0-3, 4-5, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 (idade simples, Resultados do Universo). Projecoes 2023-2025: estrutura 2022 x totais oficiais IBGE. Grupos quinquenais vêm dos Agregados por Municipios.",
+    "gerado_em": "2026-08-03T16:17:05.648339"
   },
   "populacao": {
     "total": 614054,
@@ -79,13 +79,19 @@
     "faixas_pme": {
       "fonte": "IBGE SIDRA Tabela 9514 — Censo Demografico 2022 (idade simples, Universo)",
       "total_referencia": 616317,
-      "nota": "Faixas montadas por soma de idades simples (SIDRA 9514). O total da 9514 pode diferir ligeiramente dos Agregados por Municipios (revisoes do Universo). Percentuais usam o total da 9514.",
+      "nota": "Faixas montadas por soma de idades simples (SIDRA 9514), alinhadas ao PME: 0-3 (creche), 4-5 (pre-escola), 6-14, 15-17, 18-24 e 25+. O total da 9514 pode diferir ligeiramente dos Agregados por Municipios (revisoes do Universo). Percentuais usam o total da 9514.",
       "faixas": [
         {
           "key": "0_3",
           "label": "0 a 3 anos",
           "valor": 28956,
           "pct": 4.7
+        },
+        {
+          "key": "4_5",
+          "label": "4 a 5 anos",
+          "valor": 15633,
+          "pct": 2.5
         },
         {
           "key": "6_14",
@@ -160,6 +166,12 @@
               "pct": 4.7
             },
             {
+              "key": "4_5",
+              "label": "4 a 5 anos",
+              "valor": 15633,
+              "pct": 2.5
+            },
+            {
               "key": "6_14",
               "label": "6 a 14 anos",
               "valor": 70881,
@@ -197,6 +209,12 @@
               "pct": 4.7
             },
             {
+              "key": "4_5",
+              "label": "4 a 5 anos",
+              "valor": 15633,
+              "pct": 2.5
+            },
+            {
               "key": "6_14",
               "label": "6 a 14 anos",
               "valor": 70881,
@@ -230,8 +248,14 @@
             {
               "key": "0_3",
               "label": "0 a 3 anos",
-              "valor": 30769,
+              "valor": 30768,
               "pct": 4.7
+            },
+            {
+              "key": "4_5",
+              "label": "4 a 5 anos",
+              "valor": 16611,
+              "pct": 2.5
             },
             {
               "key": "6_14",
@@ -248,7 +272,7 @@
             {
               "key": "18_24",
               "label": "18 a 24 anos",
-              "valor": 69601,
+              "valor": 69600,
               "pct": 10.6
             },
             {
@@ -271,21 +295,27 @@
               "pct": 4.7
             },
             {
+              "key": "4_5",
+              "label": "4 a 5 anos",
+              "valor": 16856,
+              "pct": 2.5
+            },
+            {
               "key": "6_14",
               "label": "6 a 14 anos",
-              "valor": 76428,
+              "valor": 76427,
               "pct": 11.5
             },
             {
               "key": "15_17",
               "label": "15 a 17 anos",
-              "valor": 25100,
+              "valor": 25099,
               "pct": 3.8
             },
             {
               "key": "18_24",
               "label": "18 a 24 anos",
-              "valor": 70627,
+              "valor": 70626,
               "pct": 10.6
             },
             {

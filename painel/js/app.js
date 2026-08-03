@@ -10480,7 +10480,7 @@ function renderCensoIbge() {
       <span class="section-divider-line"></span>
     </div>
 
-    <div id="censo-ibge-pme" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px"></div>
+    <div id="censo-ibge-pme" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:10px"></div>
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:4px">
       <div class="chart-card">
         <div class="chart-title">População por faixas educacionais — ${anoRef}</div>
@@ -10616,12 +10616,13 @@ function renderCensoIbge() {
       </div>`).join('');
   }
 
-  // Faixas PME oficiais (SIDRA 9514)
+  // Faixas PME oficiais (SIDRA 9514) — 0-3, 4-5, 6-14, 15-17, 18-24, 25+
+  const PME_FAIXA_COLORS = ['#FFCB04', '#FB8C00', '#003866', '#1565C0', '#2E6FA0', '#6A1B9A'];
   const pmeEl = document.getElementById('censo-ibge-pme');
   if (pmeEl && faixasPmeList.length) {
-    const colors = ['#FFCB04', '#003866', '#1565C0', '#2E6FA0', '#6A1B9A'];
+    pmeEl.style.gridTemplateColumns = `repeat(${faixasPmeList.length},1fr)`;
     pmeEl.innerHTML = faixasPmeList.map((c, i) => `
-      <div class="chart-card" style="padding:14px 16px;border-top:3px solid ${colors[i % colors.length]}">
+      <div class="chart-card" style="padding:14px 16px;border-top:3px solid ${PME_FAIXA_COLORS[i % PME_FAIXA_COLORS.length]}">
         <div style="font-size:11px;font-weight:600;color:var(--pri);margin-bottom:6px">${c.label}</div>
         <div style="font-size:1.35rem;font-weight:800;color:#003866;line-height:1.1">${formatNum(c.valor)}</div>
         <div style="font-size:12px;font-weight:700;color:#555;margin-top:4px">${c.pct != null ? c.pct.toFixed(1) + '%' : '—'} da pop. (9514)</div>
@@ -10638,7 +10639,7 @@ function renderCensoIbge() {
         labels: faixasPmeList.map(f => f.label),
         datasets: [{
           data: vals,
-          backgroundColor: ['#FFCB04', '#003866', '#1565C0', '#2E6FA0', '#6A1B9A'],
+          backgroundColor: faixasPmeList.map((_, i) => PME_FAIXA_COLORS[i % PME_FAIXA_COLORS.length]),
           borderRadius: 3,
           maxBarThickness: 48,
         }],

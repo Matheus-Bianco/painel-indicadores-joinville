@@ -72,6 +72,7 @@ def build_faixas_pme(ages, total_9514):
         return sum(ages.get(i, 0) for i in range(a, b + 1))
 
     f03 = soma(0, 3)
+    f45 = soma(4, 5)
     f614 = soma(6, 14)
     f1517 = soma(15, 17)
     f1824 = soma(18, 24)
@@ -82,12 +83,14 @@ def build_faixas_pme(ages, total_9514):
         "fonte": "IBGE SIDRA Tabela 9514 — Censo Demografico 2022 (idade simples, Universo)",
         "total_referencia": total_9514,
         "nota": (
-            "Faixas montadas por soma de idades simples (SIDRA 9514). "
+            "Faixas montadas por soma de idades simples (SIDRA 9514), alinhadas ao PME: "
+            "0-3 (creche), 4-5 (pre-escola), 6-14, 15-17, 18-24 e 25+. "
             "O total da 9514 pode diferir ligeiramente dos Agregados por Municipios "
             "(revisoes do Universo). Percentuais usam o total da 9514."
         ),
         "faixas": [
             {"key": "0_3", "label": "0 a 3 anos", "valor": f03, "pct": pct(f03)},
+            {"key": "4_5", "label": "4 a 5 anos", "valor": f45, "pct": pct(f45)},
             {"key": "6_14", "label": "6 a 14 anos", "valor": f614, "pct": pct(f614)},
             {"key": "15_17", "label": "15 a 17 anos", "valor": f1517, "pct": pct(f1517)},
             {"key": "18_24", "label": "18 a 24 anos", "valor": f1824, "pct": pct(f1824)},
@@ -313,7 +316,7 @@ def main():
             "co_municipio": CO_MUN,
             "ano_referencia": 2022,
             "nota_faixas": (
-                "Faixas educacionais (0-3, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 "
+                "Faixas educacionais (0-3, 4-5, 6-14, 15-17, 18-24, 25+) vêm da SIDRA 9514 "
                 "(idade simples, Resultados do Universo). "
                 "Projecoes 2023-2025: estrutura 2022 x totais oficiais IBGE. "
                 "Grupos quinquenais vêm dos Agregados por Municipios."
@@ -344,7 +347,9 @@ def main():
         print(f"  {f['label']}: {f['valor']:,} ({f['pct']}%)")
     for ano in ["2022", "2023", "2024", "2025"]:
         y = projecoes_pme["por_ano"][ano]
-        print(f"  [{ano}] total={y['total']:,} | 6-14={next(x['valor'] for x in y['faixas'] if x['key']=='6_14'):,}")
+        f45 = next(x["valor"] for x in y["faixas"] if x["key"] == "4_5")
+        f614 = next(x["valor"] for x in y["faixas"] if x["key"] == "6_14")
+        print(f"  [{ano}] total={y['total']:,} | 4-5={f45:,} | 6-14={f614:,}")
     print("  Alfabetizacao 15+:", alfabetizacao["taxa_alfabetizacao_15_mais"], "%")
 
 
