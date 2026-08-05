@@ -503,12 +503,17 @@ def etl_docentes():
 
             # Lista de escolas do universo 2025 (para banner/modal na Docência)
             escolas_list = []
+            esco_cols = DOC_COLS_PERFIL.get("por_escolaridade", [])
             for _, r in df_25.iterrows():
                 inep = str(int(r["CO_ENTIDADE"])) if pd.notna(r.get("CO_ENTIDADE")) else ""
                 nome = str(r["NO_ENTIDADE"]).strip() if "NO_ENTIDADE" in df_25.columns and pd.notna(r.get("NO_ENTIDADE")) else inep
                 bairro = str(r["NO_BAIRRO"]).strip() if "NO_BAIRRO" in df_25.columns and pd.notna(r.get("NO_BAIRRO")) else ""
                 doc_n = safe_int(r.get("QT_DOC_BAS")) if "QT_DOC_BAS" in df_25.columns else 0
                 mat_n = safe_int(r.get("QT_MAT_BAS")) if "QT_MAT_BAS" in df_25.columns else 0
+                por_esco = {}
+                for c in esco_cols:
+                    if c in df_25.columns:
+                        por_esco[DOC_LABELS.get(c, c)] = safe_int(r.get(c))
                 escolas_list.append({
                     "inep": inep,
                     "nome": nome,
@@ -516,6 +521,7 @@ def etl_docentes():
                     "docentes": doc_n,
                     "matriculas": mat_n,
                     "razao": round(mat_n / doc_n, 1) if doc_n > 0 and mat_n > 0 else None,
+                    "por_escolaridade": por_esco,
                 })
             escolas_list.sort(key=lambda x: (-x["docentes"], x["nome"]))
             resultado["escolas_2025"] = escolas_list

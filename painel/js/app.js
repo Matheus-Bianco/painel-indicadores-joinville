@@ -3492,6 +3492,87 @@ function avisoUniversoDocenciaHTML() {
     </div>`;
 }
 
+/** Modal: escolas com docentes na categoria de escolaridade clicada. */
+function openDocEscolaridadeEscolasModal(categoria) {
+  const lista = (S.doc?.escolas_2025 || [])
+    .map(e => {
+      const n = e.por_escolaridade?.[categoria] || 0;
+      return n > 0 ? { ...e, n_cat: n } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.n_cat - a.n_cat || (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+
+  const explicacoes = {
+    'Ens. Fundamental': 'Docentes cuja maior escolaridade declarada é o Ensino Fundamental.',
+    'Ens. Medio': 'Docentes cuja maior escolaridade declarada é o Ensino Médio (sem graduação superior).',
+    'Superior': 'Total de docentes com graduação superior (bacharelado, licenciatura ou tecnólogo). Contém as duas categorias à direita: Licenciatura + Superior sem Licenciatura.',
+    'Licenciatura': 'Docentes com graduação superior do tipo Licenciatura (formação pedagógica para lecionar). Subconjunto de Superior.',
+    'Sup. sem Licenciatura': 'Docentes com graduação superior que não é Licenciatura (ex.: bacharelado ou tecnólogo). Podem atuar na educação básica, mas não têm a formação pedagógica típica de licenciatura. Subconjunto de Superior.',
+  };
+  const expl = explicacoes[categoria] || 'Categoria do Censo Escolar (INEP) — Tabela de Docentes 2025.';
+  const label = REDE_LABELS[S.redeSel] || S.redeSel;
+  const totalDoc = lista.reduce((s, e) => s + e.n_cat, 0);
+
+  const existing = document.getElementById('doc-esco-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'doc-esco-modal-overlay';
+  overlay.className = 'conv-modal-overlay';
+  overlay.innerHTML = `
+    <div class="conv-modal" role="dialog" aria-modal="true" aria-labelledby="doc-esco-modal-title">
+      <div class="conv-modal-header">
+        <div>
+          <div class="conv-modal-title" id="doc-esco-modal-title">${categoria} — escolas</div>
+          <div class="conv-modal-sub">${formatNum(lista.length)} escola${lista.length !== 1 ? 's' : ''} · ${formatNum(totalDoc)} docente${totalDoc !== 1 ? 's' : ''} · rede ${label}</div>
+        </div>
+        <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="conv-modal-note">${expl}</div>
+      <div class="conv-modal-search-wrap">
+        <input type="text" id="doc-esco-search" class="conv-modal-search" placeholder="Buscar por nome, INEP ou bairro...">
+      </div>
+      <div class="conv-modal-table-wrap">
+        ${lista.length ? `
+        <table class="data-table conv-modal-table">
+          <thead><tr>
+            <th>#</th><th>Escola</th><th>INEP</th><th>Bairro</th><th>${categoria}</th><th>Docentes (total)</th>
+          </tr></thead>
+          <tbody>
+            ${lista.map((e, i) => `
+              <tr data-q="${String(e.nome || '').toLowerCase()} ${e.inep || ''} ${String(e.bairro || '').toLowerCase()}">
+                <td>${i + 1}</td>
+                <td><strong>${e.nome || '—'}</strong></td>
+                <td>${e.inep || '—'}</td>
+                <td>${e.bairro || '—'}</td>
+                <td><strong>${formatNum(e.n_cat)}</strong></td>
+                <td>${formatNum(e.docentes || 0)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : `<p style="padding:24px;text-align:center;color:#888;font-size:12px">Nenhuma escola com docentes nesta categoria.</p>`}
+      </div>
+      <div class="conv-modal-footer">Fonte: INEP — Censo Escolar 2025 (Tabela de Docentes) · Clique fora ou Esc para fechar</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('.conv-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  const search = overlay.querySelector('#doc-esco-search');
+  if (search) {
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      overlay.querySelectorAll('tbody tr').forEach(tr => {
+        tr.style.display = (!q || tr.dataset.q.includes(q)) ? '' : 'none';
+      });
+    });
+    setTimeout(() => search.focus(), 50);
+  }
+  document.addEventListener('keydown', function onEsc(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  });
+}
+
 /** Modal com a lista de escolas do universo Docência (escolas_2025). */
 function openDocEscolasUniversoModal() {
   const lista = S.doc?.escolas_2025 || [];
@@ -3607,8 +3688,9 @@ function renderDocencia() {
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
       <div class="chart-card d4">
         <div class="chart-title">Escolaridade dos Docentes${geoSuffix()}</div>
-        <div style="height:270px"><canvas id="chart-doc-esco"></canvas></div>
-        <div class="chart-source">${FONTE_CENSO}</div>
+        <div style="height:270px;cursor:pointer"><canvas id="chart-doc-esco"></canvas></div>
+        <div id="doc-esco-nota" style="font-size:10px;color:#555;line-height:1.45;padding:6px 2px 0;border-top:1px dashed rgba(0,0,0,.08);margin-top:6px"></div>
+        <div class="chart-source">${FONTE_CENSO} · Clique numa barra para ver as escolas</div>
       </div>
       <div class="chart-card d5">
         <div class="chart-title">Faixa Etária${geoSuffix()}</div>
@@ -4192,15 +4274,85 @@ function buildDocCharts(doc) {
       ${deltaTxt}`;
   }
 
-  // Bar for escolaridade
+  // Bar for escolaridade — números absolutos + hierarquia + drill-down por escola
   const escoEl = document.getElementById('chart-doc-esco');
+  const escoNotaEl = document.getElementById('doc-esco-nota');
   if (escoEl && p.por_escolaridade) {
+    // Ordem didática: níveis exclusivos (EF/EM/Superior) + desdobramento do Superior
+    const escoOrder = ['Ens. Fundamental', 'Ens. Medio', 'Superior', 'Licenciatura', 'Sup. sem Licenciatura'];
+    const escoLabels = escoOrder.filter(k => p.por_escolaridade[k] != null);
+    const escoVals = escoLabels.map(k => p.por_escolaridade[k] || 0);
+    const escoColors = escoLabels.map(k =>
+      (k === 'Licenciatura' || k === 'Sup. sem Licenciatura') ? '#00838FCC' : '#1565C0CC'
+    );
+    const nSup = p.por_escolaridade['Superior'] || 0;
+    const nLic = p.por_escolaridade['Licenciatura'] || 0;
+    const nSlic = p.por_escolaridade['Sup. sem Licenciatura'] || 0;
+    if (escoNotaEl) {
+      escoNotaEl.innerHTML = `
+        <strong>Como ler:</strong> as 3 primeiras barras são o nível máximo de escolaridade
+        (Ens. Fundamental + Ens. Médio + Superior ≈ total de docentes).
+        <strong>Licenciatura</strong> e <strong>Sup. sem Licenciatura</strong> (barras em teal)
+        <em>desdobram</em> o Superior — não somam a mais no total.
+        <strong>Sup. sem Licenciatura</strong> = graduação (bacharelado/tecnólogo) sem formação de licenciatura.
+        Clique numa barra para listar as escolas.
+        ${nSup ? ` · Superior ${formatNum(nSup)} = Lic. ${formatNum(nLic)} + Sem Lic. ${formatNum(nSlic)}${(nLic + nSlic) !== nSup ? ` <span style="color:#888">(soma Inep ${formatNum(nLic + nSlic)}; pequena divergência residual da tabela)</span>` : ''}` : ''}`;
+    }
     S.charts.push(new Chart(escoEl, {
       type: 'bar',
-      data: { labels: Object.keys(p.por_escolaridade), datasets: [{ data: Object.values(p.por_escolaridade), backgroundColor: '#1565C0CC', borderRadius: 6 }] },
-      options: { ...CHART_DEFAULTS, layout: { padding: { bottom: 10, top: 20 } },
-        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, datalabels: DL_BAR },
-        scales: { ...CHART_DEFAULTS.scales, x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x?.ticks, font: { family: 'Inter', size: 9 }, maxRotation: 35, minRotation: 15 } } } }
+      data: {
+        labels: escoLabels,
+        datasets: [{ data: escoVals, backgroundColor: escoColors, borderRadius: 6 }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        layout: { padding: { bottom: 10, top: 20 } },
+        onClick: (_evt, elements) => {
+          if (!elements?.length) return;
+          const cat = escoLabels[elements[0].index];
+          if (cat) openDocEscolaridadeEscolasModal(cat);
+        },
+        onHover: (evt, elements) => {
+          const canvas = evt?.native?.target || escoEl;
+          if (canvas?.style) canvas.style.cursor = elements?.length ? 'pointer' : 'default';
+        },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          datalabels: {
+            ...DL_BAR,
+            formatter: v => formatNum(v),
+            font: { family: 'Inter', size: 10, weight: '700' },
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${formatNum(ctx.parsed.y)} docentes`,
+              afterBody: ctx => {
+                const cat = ctx[0]?.label;
+                if (cat === 'Sup. sem Licenciatura') return ['Graduação sem licenciatura (bacharelado/tecnólogo).', 'Clique para ver as escolas.'];
+                if (cat === 'Ens. Medio') return ['Maior escolaridade = Ensino Médio.', 'Clique para ver as escolas.'];
+                if (cat === 'Superior') return ['Total com graduação (inclui Lic. + Sem Lic.).'];
+                if (cat === 'Licenciatura') return ['Subconjunto de Superior.', 'Clique para ver as escolas.'];
+                return ['Clique para ver as escolas.'];
+              },
+            },
+          },
+        },
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          x: {
+            ...CHART_DEFAULTS.scales.x,
+            ticks: { ...CHART_DEFAULTS.scales.x?.ticks, font: { family: 'Inter', size: 9 }, maxRotation: 35, minRotation: 15 },
+          },
+          y: {
+            ...CHART_DEFAULTS.scales.y,
+            ticks: {
+              ...CHART_DEFAULTS.scales.y?.ticks,
+              callback: v => formatNum(v),
+            },
+          },
+        },
+      },
     }));
   }
 
