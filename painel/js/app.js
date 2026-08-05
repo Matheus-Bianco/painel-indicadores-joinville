@@ -3492,6 +3492,45 @@ function avisoUniversoDocenciaHTML() {
     </div>`;
 }
 
+/** Exporta CSV do detalhamento de escolaridade por escola. */
+function exportDocEscolaridadeCSV(categoria, lista) {
+  const rede = getRedeLabel();
+  const metaRows = [
+    ['Fonte', 'INEP — Censo Escolar 2025 (Tabela de Docentes)'],
+    ['Rede', rede],
+    ['Município', JV_MODE ? JV.munNome : (getExportGeoLabel() || '')],
+    ['Categoria', categoria],
+    ['Gerado em', new Date().toLocaleString('pt-BR')],
+    [],
+  ];
+  const header = ['#', 'Escola', 'INEP', 'Bairro', categoria, 'Docentes (total)', 'Matrículas', 'Razão A/P'];
+  const rows = lista.map((e, i) => [
+    i + 1,
+    e.nome || '',
+    e.inep || '',
+    e.bairro || '',
+    e.n_cat ?? 0,
+    e.docentes ?? 0,
+    e.matriculas ?? '',
+    e.razao != null ? String(e.razao).replace('.', ',') : '',
+  ]);
+  const csv = '\uFEFF' + [...metaRows, header, ...rows]
+    .map(r => r.map(c => {
+      const s = String(c ?? '');
+      return s.includes(';') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(';'))
+    .join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const slug = categoria.replace(/[^a-zA-ZÀ-ú0-9 ]/g, '').trim().replace(/\s+/g, '_');
+  a.download = `Docentes_${slug}_escolas_${rede.replace(/\s+/g, '_')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Modal: escolas com docentes na categoria de escolaridade clicada. */
 function openDocEscolaridadeEscolasModal(categoria) {
   const lista = (S.doc?.escolas_2025 || [])
@@ -3526,7 +3565,10 @@ function openDocEscolaridadeEscolasModal(categoria) {
           <div class="conv-modal-title" id="doc-esco-modal-title">${categoria} — escolas</div>
           <div class="conv-modal-sub">${formatNum(lista.length)} escola${lista.length !== 1 ? 's' : ''} · ${formatNum(totalDoc)} docente${totalDoc !== 1 ? 's' : ''} · rede ${label}</div>
         </div>
-        <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${lista.length ? `<button type="button" id="doc-esco-export-csv" class="map-layer-btn" style="white-space:nowrap" title="Baixar tabela em CSV">Exportar CSV</button>` : ''}
+          <button type="button" class="conv-modal-close" aria-label="Fechar">&times;</button>
+        </div>
       </div>
       <div class="conv-modal-note">${expl}</div>
       <div class="conv-modal-search-wrap">
@@ -3534,7 +3576,7 @@ function openDocEscolaridadeEscolasModal(categoria) {
       </div>
       <div class="conv-modal-table-wrap">
         ${lista.length ? `
-        <table class="data-table conv-modal-table">
+        <table class="data-table conv-modal-table" id="doc-esco-modal-table">
           <thead><tr>
             <th>#</th><th>Escola</th><th>INEP</th><th>Bairro</th><th>${categoria}</th><th>Docentes (total)</th>
           </tr></thead>
@@ -3558,6 +3600,9 @@ function openDocEscolaridadeEscolasModal(categoria) {
   const close = () => overlay.remove();
   overlay.querySelector('.conv-modal-close').addEventListener('click', close);
   overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  overlay.querySelector('#doc-esco-export-csv')?.addEventListener('click', () => {
+    exportDocEscolaridadeCSV(categoria, lista);
+  });
   const search = overlay.querySelector('#doc-esco-search');
   if (search) {
     search.addEventListener('input', () => {
@@ -3689,8 +3734,9 @@ function renderDocencia() {
       <div class="chart-card d4">
         <div class="chart-title">Escolaridade dos Docentes${geoSuffix()}</div>
         <div style="height:270px;cursor:pointer"><canvas id="chart-doc-esco"></canvas></div>
+        <div id="doc-esco-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0 2px"></div>
         <div id="doc-esco-nota" style="font-size:10px;color:#555;line-height:1.45;padding:6px 2px 0;border-top:1px dashed rgba(0,0,0,.08);margin-top:6px"></div>
-        <div class="chart-source">${FONTE_CENSO} · Clique numa barra para ver as escolas</div>
+        <div class="chart-source">${FONTE_CENSO} · Clique na barra ou no botão da categoria para ver as escolas</div>
       </div>
       <div class="chart-card d5">
         <div class="chart-title">Faixa Etária${geoSuffix()}</div>
@@ -4277,6 +4323,7 @@ function buildDocCharts(doc) {
   // Bar for escolaridade — números absolutos + hierarquia + drill-down por escola
   const escoEl = document.getElementById('chart-doc-esco');
   const escoNotaEl = document.getElementById('doc-esco-nota');
+  const escoChipsEl = document.getElementById('doc-esco-chips');
   if (escoEl && p.por_escolaridade) {
     // Ordem didática: níveis exclusivos (EF/EM/Superior) + desdobramento do Superior
     const escoOrder = ['Ens. Fundamental', 'Ens. Medio', 'Superior', 'Licenciatura', 'Sup. sem Licenciatura'];
@@ -4295,26 +4342,57 @@ function buildDocCharts(doc) {
         <strong>Licenciatura</strong> e <strong>Sup. sem Licenciatura</strong> (barras em teal)
         <em>desdobram</em> o Superior — não somam a mais no total.
         <strong>Sup. sem Licenciatura</strong> = graduação (bacharelado/tecnólogo) sem formação de licenciatura.
-        Clique numa barra para listar as escolas.
+        Use os botões abaixo (barras pequenas ficam difíceis de clicar).
         ${nSup ? ` · Superior ${formatNum(nSup)} = Lic. ${formatNum(nLic)} + Sem Lic. ${formatNum(nSlic)}${(nLic + nSlic) !== nSup ? ` <span style="color:#888">(soma Inep ${formatNum(nLic + nSlic)}; pequena divergência residual da tabela)</span>` : ''}` : ''}`;
     }
+    if (escoChipsEl) {
+      escoChipsEl.innerHTML = escoLabels.map((k, i) => {
+        const teal = k === 'Licenciatura' || k === 'Sup. sem Licenciatura';
+        return `<button type="button" class="doc-esco-chip" data-cat="${k}"
+          style="font-size:10.5px;font-family:Inter;font-weight:600;padding:5px 10px;border-radius:6px;cursor:pointer;
+            border:1px solid ${teal ? '#00838F55' : '#1565C055'};
+            background:${teal ? 'rgba(0,131,143,.08)' : 'rgba(21,101,192,.08)'};
+            color:${teal ? '#006064' : '#0D47A1'}">
+          ${k} <span style="opacity:.75">(${formatNum(escoVals[i])})</span>
+        </button>`;
+      }).join('');
+      escoChipsEl.querySelectorAll('.doc-esco-chip').forEach(btn => {
+        btn.addEventListener('click', () => openDocEscolaridadeEscolasModal(btn.dataset.cat));
+      });
+    }
+    const openEscoFromChart = (evt, elements, chart) => {
+      let els = elements;
+      // Barras minúsculas (ex.: Ens. Médio = 6): pega a categoria mais próxima no eixo X
+      if (!els?.length && chart) {
+        els = chart.getElementsAtEventForMode(evt, 'nearest', { axis: 'x', intersect: false }, true);
+      }
+      if (!els?.length) return;
+      const cat = escoLabels[els[0].index];
+      if (cat) openDocEscolaridadeEscolasModal(cat);
+    };
     S.charts.push(new Chart(escoEl, {
       type: 'bar',
       data: {
         labels: escoLabels,
-        datasets: [{ data: escoVals, backgroundColor: escoColors, borderRadius: 6 }],
+        datasets: [{
+          data: escoVals,
+          backgroundColor: escoColors,
+          borderRadius: 6,
+          minBarLength: 12, // garante área clicável mesmo com valor ~0–6
+        }],
       },
       options: {
         ...CHART_DEFAULTS,
         layout: { padding: { bottom: 10, top: 20 } },
-        onClick: (_evt, elements) => {
-          if (!elements?.length) return;
-          const cat = escoLabels[elements[0].index];
-          if (cat) openDocEscolaridadeEscolasModal(cat);
-        },
-        onHover: (evt, elements) => {
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        onClick: openEscoFromChart,
+        onHover: (evt, elements, chart) => {
           const canvas = evt?.native?.target || escoEl;
-          if (canvas?.style) canvas.style.cursor = elements?.length ? 'pointer' : 'default';
+          let els = elements;
+          if (!els?.length && chart) {
+            els = chart.getElementsAtEventForMode(evt, 'nearest', { axis: 'x', intersect: false }, true);
+          }
+          if (canvas?.style) canvas.style.cursor = els?.length ? 'pointer' : 'default';
         },
         plugins: {
           ...CHART_DEFAULTS.plugins,
