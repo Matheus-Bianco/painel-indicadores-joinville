@@ -5542,119 +5542,94 @@ function buildIdebRankingHTML(ideb, anoSel) {
     ${buildIdebFullRankingTableHTML(rk)}`;
 }
 
-/** Tabelona: ranking completo SC (rede municipal) + filtro 10 maiores. */
+/** Duas tabelonas: ranking completo SC por etapa (AI e AF). */
 function buildIdebFullRankingTableHTML(rk) {
   if (!rk) return '';
   const ano = rk.ano || '2023';
-  const ai = rk.sc_geral?.AI || [];
-  const af = rk.sc_geral?.AF || [];
   const top10 = rk.top10_cidades?.linhas || [];
   const top10Codes = new Set(top10.map(r => r.cod));
   const popMap = Object.fromEntries(top10.map(r => [r.cod, r.populacao]));
-
-  const byCod = {};
-  for (const r of ai) {
-    byCod[r.cod] = {
-      cod: r.cod, nome: r.nome,
-      pos_ai: r.posicao, ideb_ai: r.ideb,
-      pos_af: null, ideb_af: null,
-    };
-  }
-  for (const r of af) {
-    if (!byCod[r.cod]) {
-      byCod[r.cod] = { cod: r.cod, nome: r.nome, pos_ai: null, ideb_ai: null, pos_af: null, ideb_af: null };
-    }
-    byCod[r.cod].pos_af = r.posicao;
-    byCod[r.cod].ideb_af = r.ideb;
-  }
-
-  const rows = Object.values(byCod)
-    .map(r => ({
-      ...r,
-      is_top10: top10Codes.has(r.cod),
-      populacao: popMap[r.cod] || null,
-    }))
-    .sort((a, b) => {
-      const pa = a.pos_ai ?? 9999;
-      const pb = b.pos_ai ?? 9999;
-      if (pa !== pb) return pa - pb;
-      return (a.pos_af ?? 9999) - (b.pos_af ?? 9999);
-    });
 
   const th = (col, txt, align = 'left', title = '') =>
     `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
       style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
 
-  const body = rows.map(r => {
-    const isJv = r.cod === '4209102';
-    const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
-    const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return `<tr data-top10="${r.is_top10 ? '1' : '0'}" data-nome="${nomeNorm}"
-      data-pos_ai="${r.pos_ai ?? ''}" data-pos_af="${r.pos_af ?? ''}"
-      data-ideb_ai="${r.ideb_ai ?? ''}" data-ideb_af="${r.ideb_af ?? ''}"
-      data-populacao="${r.populacao ?? ''}" style="${bg}">
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1a365d">${r.pos_ai ?? '—'}</td>
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1565C0">${r.pos_af ?? '—'}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px">${isJv ? `<strong>${r.nome}</strong>` : r.nome}${r.is_top10 ? ' <span style="font-size:9px;color:#888;font-weight:600">(top 10 pop.)</span>' : ''}</td>
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_ai)}">${fmtIdebNum(r.ideb_ai)}</td>
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_af)}">${fmtIdebNum(r.ideb_af)}</td>
-      <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-size:10px;color:#666">${r.populacao ? r.populacao.toLocaleString('pt-BR') : '—'}</td>
-    </tr>`;
-  }).join('');
+  const buildEtapaTable = (et, label) => {
+    const rows = (rk.sc_geral?.[et] || []).map(r => ({
+      ...r,
+      is_top10: top10Codes.has(r.cod),
+      populacao: popMap[r.cod] || null,
+    }));
+    if (!rows.length) return '';
+    const slug = et.toLowerCase();
+    const posColor = et === 'AI' ? '#1a365d' : '#1565C0';
+    const body = rows.map(r => {
+      const isJv = r.cod === '4209102';
+      const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
+      const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return `<tr data-top10="${r.is_top10 ? '1' : '0'}" data-nome="${nomeNorm}"
+        data-pos="${r.posicao ?? ''}" data-ideb="${r.ideb ?? ''}" data-populacao="${r.populacao ?? ''}" style="${bg}">
+        <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${posColor}">${r.posicao ?? '—'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px">${isJv ? `<strong>${r.nome}</strong>` : r.nome}${r.is_top10 ? ' <span style="font-size:9px;color:#888;font-weight:600">(top 10 pop.)</span>' : ''}</td>
+        <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb)}">${fmtIdebNum(r.ideb)}</td>
+        <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-size:10px;color:#666">${r.populacao ? r.populacao.toLocaleString('pt-BR') : '—'}</td>
+      </tr>`;
+    }).join('');
 
-  return `
-    <div class="section-divider" style="margin-top:14px">
-      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
-      <span class="section-divider-text">Ranking completo — Santa Catarina (${ano})</span>
-      <span class="section-divider-line"></span>
-    </div>
+    return `
+      <div class="section-divider" style="margin-top:14px">
+        <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+        <span class="section-divider-text">Ranking completo — Santa Catarina (${ano}) — ${label}</span>
+        <span class="section-divider-line"></span>
+      </div>
 
-    <div class="chart-card" style="padding:0;overflow:hidden">
-      <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-        <div class="chart-title" style="margin:0">Todos os municípios · rede municipal</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
-            Recorte
-            <select id="ideb-rank-full-filtro" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
-              <option value="todos" selected>Todos os municípios de SC</option>
-              <option value="top10">Só as 10 maiores cidades</option>
-            </select>
-          </label>
-          <input type="text" id="ideb-rank-full-search" placeholder="Buscar município..."
-            style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #ccc;font-family:Inter;min-width:180px">
-          <span id="ideb-rank-full-count" style="font-size:10.5px;color:#666;white-space:nowrap"></span>
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div class="chart-title" style="margin:0">${rows.length} municípios · rede municipal</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+              Recorte
+              <select id="ideb-rank-${slug}-filtro" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
+                <option value="todos" selected>Todos os municípios de SC</option>
+                <option value="top10">Só as 10 maiores cidades</option>
+              </select>
+            </label>
+            <input type="text" id="ideb-rank-${slug}-search" placeholder="Buscar município..."
+              style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #ccc;font-family:Inter;min-width:180px">
+            <span id="ideb-rank-${slug}-count" style="font-size:10.5px;color:#666;white-space:nowrap"></span>
+          </div>
         </div>
-      </div>
-      <div style="max-height:480px;overflow:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:640px" id="ideb-rank-full-table" class="data-table">
-          <thead><tr>
-            ${th('pos_ai', 'Posição Anos Iniciais', 'center', 'Posição no ranking de Anos Iniciais (1º = melhor)')}
-            ${th('pos_af', 'Posição Anos Finais', 'center', 'Posição no ranking de Anos Finais (1º = melhor)')}
-            ${th('nome', 'Município', 'left', 'Nome do município')}
-            ${th('ideb_ai', 'IDEB AI', 'center', 'IDEB Anos Iniciais')}
-            ${th('ideb_af', 'IDEB AF', 'center', 'IDEB Anos Finais')}
-            ${th('populacao', 'Habitantes', 'right', 'População (disponível nas 10 maiores)')}
-          </tr></thead>
-          <tbody id="ideb-rank-full-tbody">${body}</tbody>
-        </table>
-      </div>
-      <div class="chart-source" style="padding:8px 12px">
-        Fonte: IDEB/INEP ${ano} (VL_OBSERVADO, rede municipal) ·
-        Posição = ranking estadual por etapa · Habitantes só nas 10 maiores (IBGE 2025) · Clique nos cabeçalhos para ordenar
-      </div>
-    </div>`;
+        <div style="max-height:480px;overflow:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:480px" id="ideb-rank-${slug}-table" class="data-table">
+            <thead><tr>
+              ${th('pos', 'Posição', 'center', 'Posição no ranking (1º = melhor)')}
+              ${th('nome', 'Município', 'left', 'Nome do município')}
+              ${th('ideb', 'IDEB', 'center', `IDEB ${label}`)}
+              ${th('populacao', 'Habitantes', 'right', 'População (disponível nas 10 maiores)')}
+            </tr></thead>
+            <tbody id="ideb-rank-${slug}-tbody">${body}</tbody>
+          </table>
+        </div>
+        <div class="chart-source" style="padding:8px 12px">
+          Fonte: IDEB/INEP ${ano} (VL_OBSERVADO, rede municipal) · ${label} ·
+          Habitantes só nas 10 maiores (IBGE 2025) · Clique nos cabeçalhos para ordenar
+        </div>
+      </div>`;
+  };
+
+  return `${buildEtapaTable('AI', 'Anos Iniciais')}${buildEtapaTable('AF', 'Anos Finais')}`;
 }
 
-function bindIdebFullRankingFilters() {
-  const filtro = document.getElementById('ideb-rank-full-filtro');
-  const search = document.getElementById('ideb-rank-full-search');
-  const tbody = document.getElementById('ideb-rank-full-tbody');
-  const thead = document.querySelector('#ideb-rank-full-table thead');
-  const countEl = document.getElementById('ideb-rank-full-count');
+function bindIdebFullRankingTable(slug) {
+  const filtro = document.getElementById(`ideb-rank-${slug}-filtro`);
+  const search = document.getElementById(`ideb-rank-${slug}-search`);
+  const tbody = document.getElementById(`ideb-rank-${slug}-tbody`);
+  const thead = document.querySelector(`#ideb-rank-${slug}-table thead`);
+  const countEl = document.getElementById(`ideb-rank-${slug}-count`);
   if (!filtro || !tbody) return;
 
-  let sortCol = 'pos_ai';
-  let sortAsc = true; // posição: menor (melhor) primeiro
+  let sortCol = 'pos';
+  let sortAsc = true;
 
   const applyFilter = () => {
     const mode = filtro.value;
@@ -5676,7 +5651,7 @@ function bindIdebFullRankingFilters() {
 
   const applySort = () => {
     const rows = [...tbody.querySelectorAll('tr')];
-    const numCols = new Set(['pos_ai', 'pos_af', 'ideb_ai', 'ideb_af', 'populacao']);
+    const numCols = new Set(['pos', 'ideb', 'populacao']);
     rows.sort((a, b) => {
       if (sortCol === 'nome') {
         const va = a.dataset.nome || '';
@@ -5720,14 +5695,18 @@ function bindIdebFullRankingFilters() {
     if (sortCol === col) sortAsc = !sortAsc;
     else {
       sortCol = col;
-      // Posição/nome: asc; IDEB/hab: desc por padrão
-      sortAsc = (col === 'pos_ai' || col === 'pos_af' || col === 'nome');
+      sortAsc = (col === 'pos' || col === 'nome');
     }
     applySort();
     applyFilter();
   });
   applySort();
   applyFilter();
+}
+
+function bindIdebFullRankingFilters() {
+  bindIdebFullRankingTable('ai');
+  bindIdebFullRankingTable('af');
 }
 
 /** Ordenação por clique em th.sortable[data-col] (usa data-* nas linhas). */
