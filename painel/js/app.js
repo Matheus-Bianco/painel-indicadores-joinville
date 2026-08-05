@@ -5317,8 +5317,9 @@ function buildIdebRankingHTML(ideb) {
   const top10 = rk.top10_cidades?.linhas || [];
   const jvTop = rk.top10_cidades?.joinville || {};
 
-  const th = (txt, align = 'left') =>
-    `<th style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap">${txt}</th>`;
+  const th = (col, txt, align = 'left', title = '') =>
+    `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
+      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
   const td = (html, align = 'left', extra = '') =>
     `<td style="padding:6px 8px;text-align:${align};border-bottom:1px solid #eee;font-size:11px;${extra}">${html}</td>`;
 
@@ -5331,7 +5332,9 @@ function buildIdebRankingHTML(ideb) {
       const isJv = r.cod === '4209102';
       const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
       const delta = (jvIdeb != null && r.ideb != null) ? +(r.ideb - jvIdeb).toFixed(1) : null;
-      return `<tr style="${bg}">
+      const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return `<tr style="${bg}" data-pos="${r.posicao ?? ''}" data-nome="${nomeNorm}"
+        data-ideb="${r.ideb ?? ''}" data-delta="${isJv ? 0 : (delta ?? '')}">
         ${td(r.posicao, 'center', 'font-weight:700;color:#1a365d')}
         ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
         ${td((r.ideb ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb)}`)}
@@ -5348,12 +5351,17 @@ function buildIdebRankingHTML(ideb) {
           </div>
         </div>
         <div style="max-height:340px;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse">
-            <thead><tr>${th('#', 'center')}${th('Município')}${th('IDEB', 'center')}${th('Δ vs Joinville', 'center')}</tr></thead>
+          <table id="ideb-sc-${et.toLowerCase()}-table" style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              ${th('pos', 'Pos.', 'center', 'Posição no ranking (1º = melhor)')}
+              ${th('nome', 'Município')}
+              ${th('ideb', 'IDEB', 'center')}
+              ${th('delta', 'Δ vs Joinville', 'center')}
+            </tr></thead>
             <tbody>${body}</tbody>
           </table>
         </div>
-        <div class="chart-source" style="padding:8px 12px">Fonte: IDEB/INEP — rede municipal · Top do ranking + posição de Joinville</div>
+        <div class="chart-source" style="padding:8px 12px">Fonte: IDEB/INEP — rede municipal · Top do ranking + posição de Joinville · Clique nos cabeçalhos para ordenar</div>
       </div>`;
   };
 
@@ -5362,7 +5370,11 @@ function buildIdebRankingHTML(ideb) {
     const isJv = r.cod === '4209102';
     const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
     const pop = (r.populacao || 0).toLocaleString('pt-BR');
-    return `<tr style="${bg}">
+    const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return `<tr style="${bg}" data-rank_pop="${r.rank_pop ?? ''}" data-nome="${nomeNorm}"
+      data-populacao="${r.populacao ?? ''}"
+      data-pos_ai="${r.posicao_top10_ai ?? ''}" data-ideb_ai="${r.ideb_ai ?? ''}" data-delta_ai="${isJv ? 0 : (r.delta_ai_vs_joinville ?? '')}"
+      data-pos_af="${r.posicao_top10_af ?? ''}" data-ideb_af="${r.ideb_af ?? ''}" data-delta_af="${isJv ? 0 : (r.delta_af_vs_joinville ?? '')}">
       ${td(r.rank_pop, 'center', 'color:#666')}
       ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
       ${td(pop, 'right', 'color:#666;font-size:10px')}
@@ -5409,16 +5421,22 @@ function buildIdebRankingHTML(ideb) {
         </div>
       </div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:720px">
+        <table id="ideb-top10-table" style="width:100%;border-collapse:collapse;min-width:720px">
           <thead><tr>
-            ${th('Pop.', 'center')}${th('Município')}${th('Hab.', 'right')}
-            ${th('Pos. AI', 'center')}${th('IDEB AI', 'center')}${th('Δ AI', 'center')}
-            ${th('Pos. AF', 'center')}${th('IDEB AF', 'center')}${th('Δ AF', 'center')}
+            ${th('rank_pop', 'Pop.', 'center', 'Ordem por população')}
+            ${th('nome', 'Município')}
+            ${th('populacao', 'Hab.', 'right', 'População IBGE')}
+            ${th('pos_ai', 'Pos. AI', 'center', 'Posição entre as 10 — Anos Iniciais')}
+            ${th('ideb_ai', 'IDEB AI', 'center')}
+            ${th('delta_ai', 'Δ AI', 'center')}
+            ${th('pos_af', 'Pos. AF', 'center', 'Posição entre as 10 — Anos Finais')}
+            ${th('ideb_af', 'IDEB AF', 'center')}
+            ${th('delta_af', 'Δ AF', 'center')}
           </tr></thead>
           <tbody>${topBody}</tbody>
         </table>
       </div>
-      <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP 2023 (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10</div>
+      <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP 2023 (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10 · Clique nos cabeçalhos para ordenar</div>
     </div>
 
     ${buildIdebFullRankingTableHTML(ideb)}`;
@@ -5468,15 +5486,19 @@ function buildIdebFullRankingTableHTML(ideb) {
       return (a.pos_af ?? 9999) - (b.pos_af ?? 9999);
     });
 
-  const th = (txt, align = 'left') =>
-    `<th style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2">${txt}</th>`;
+  const th = (col, txt, align = 'left', title = '') =>
+    `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
+      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
   const fmtIdeb = v => (v == null ? '—' : String(v).replace('.', ','));
 
   const body = rows.map(r => {
     const isJv = r.cod === '4209102';
     const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
     const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return `<tr data-top10="${r.is_top10 ? '1' : '0'}" data-nome="${nomeNorm}" style="${bg}">
+    return `<tr data-top10="${r.is_top10 ? '1' : '0'}" data-nome="${nomeNorm}"
+      data-pos_ai="${r.pos_ai ?? ''}" data-ideb_ai="${r.ideb_ai ?? ''}" data-delta_ai="${r.delta_ai ?? ''}"
+      data-pos_af="${r.pos_af ?? ''}" data-ideb_af="${r.ideb_af ?? ''}" data-delta_af="${r.delta_af ?? ''}"
+      data-populacao="${r.populacao ?? ''}" style="${bg}">
       <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1a365d">${r.pos_ai ?? '—'}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px">${isJv ? `<strong>${r.nome}</strong>` : r.nome}${r.is_top10 ? ' <span style="font-size:9px;color:#888;font-weight:600">(top 10 pop.)</span>' : ''}</td>
       <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_ai)}">${fmtIdeb(r.ideb_ai)}</td>
@@ -5512,16 +5534,24 @@ function buildIdebFullRankingTableHTML(ideb) {
         </div>
       </div>
       <div style="max-height:480px;overflow:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:780px" id="ideb-rank-full-table">
+        <table style="width:100%;border-collapse:collapse;min-width:780px" id="ideb-rank-full-table" class="data-table">
           <thead><tr>
-            ${th('# AI', 'center')}${th('Município')}${th('IDEB AI', 'center')}${th('Δ AI', 'center')}
-            ${th('# AF', 'center')}${th('IDEB AF', 'center')}${th('Δ AF', 'center')}${th('Hab.', 'right')}
+            ${th('pos_ai', 'Pos. AI', 'center', 'Posição no ranking de Anos Iniciais (1º = melhor)')}
+            ${th('nome', 'Município', 'left', 'Nome do município')}
+            ${th('ideb_ai', 'IDEB AI', 'center', 'IDEB Anos Iniciais')}
+            ${th('delta_ai', 'Δ AI', 'center', 'Diferença do IDEB AI vs Joinville')}
+            ${th('pos_af', 'Pos. AF', 'center', 'Posição no ranking de Anos Finais (1º = melhor)')}
+            ${th('ideb_af', 'IDEB AF', 'center', 'IDEB Anos Finais')}
+            ${th('delta_af', 'Δ AF', 'center', 'Diferença do IDEB AF vs Joinville')}
+            ${th('populacao', 'Hab.', 'right', 'População (disponível nas 10 maiores)')}
           </tr></thead>
           <tbody id="ideb-rank-full-tbody">${body}</tbody>
         </table>
       </div>
       <div class="chart-source" style="padding:8px 12px">
-        Fonte: IDEB/INEP ${ano} (VL_OBSERVADO, rede municipal) · Δ = diferença vs Joinville · Hab. só nas 10 maiores (IBGE 2025)
+        Fonte: IDEB/INEP ${ano} (VL_OBSERVADO, rede municipal) ·
+        <strong>Pos. AI / Pos. AF</strong> = posição no ranking estadual (Anos Iniciais / Anos Finais) ·
+        Δ = diferença vs Joinville · Hab. só nas 10 maiores (IBGE 2025) · Clique nos cabeçalhos para ordenar
       </div>
     </div>`;
 }
@@ -5530,10 +5560,14 @@ function bindIdebFullRankingFilters() {
   const filtro = document.getElementById('ideb-rank-full-filtro');
   const search = document.getElementById('ideb-rank-full-search');
   const tbody = document.getElementById('ideb-rank-full-tbody');
+  const thead = document.querySelector('#ideb-rank-full-table thead');
   const countEl = document.getElementById('ideb-rank-full-count');
   if (!filtro || !tbody) return;
 
-  const apply = () => {
+  let sortCol = 'pos_ai';
+  let sortAsc = true; // posição: menor (melhor) primeiro
+
+  const applyFilter = () => {
     const mode = filtro.value;
     const q = (search?.value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     let visible = 0;
@@ -5550,9 +5584,129 @@ function bindIdebFullRankingFilters() {
         : `${visible} município${visible !== 1 ? 's' : ''}`;
     }
   };
-  filtro.addEventListener('change', apply);
-  search?.addEventListener('input', apply);
-  apply();
+
+  const applySort = () => {
+    const rows = [...tbody.querySelectorAll('tr')];
+    const numCols = new Set(['pos_ai', 'ideb_ai', 'delta_ai', 'pos_af', 'ideb_af', 'delta_af', 'populacao']);
+    rows.sort((a, b) => {
+      if (sortCol === 'nome') {
+        const va = a.dataset.nome || '';
+        const vb = b.dataset.nome || '';
+        return sortAsc ? va.localeCompare(vb, 'pt-BR') : vb.localeCompare(va, 'pt-BR');
+      }
+      const rawA = a.dataset[sortCol];
+      const rawB = b.dataset[sortCol];
+      const emptyA = rawA === '' || rawA == null;
+      const emptyB = rawB === '' || rawB == null;
+      if (emptyA && emptyB) return 0;
+      if (emptyA) return 1;
+      if (emptyB) return -1;
+      if (numCols.has(sortCol)) {
+        const va = parseFloat(rawA);
+        const vb = parseFloat(rawB);
+        return sortAsc ? va - vb : vb - va;
+      }
+      return 0;
+    });
+    rows.forEach(tr => tbody.appendChild(tr));
+    thead?.querySelectorAll('th.sortable').forEach(th => {
+      const ind = th.querySelector('.sort-ind');
+      if (!ind) return;
+      if (th.dataset.col === sortCol) {
+        ind.textContent = sortAsc ? '▲' : '▼';
+        ind.style.opacity = '1';
+      } else {
+        ind.textContent = '↕';
+        ind.style.opacity = '.55';
+      }
+    });
+  };
+
+  filtro.addEventListener('change', applyFilter);
+  search?.addEventListener('input', applyFilter);
+  thead?.addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const col = th.dataset.col;
+    if (sortCol === col) sortAsc = !sortAsc;
+    else {
+      sortCol = col;
+      // Posição: asc (1º no topo); IDEB/Δ/pop: desc por padrão
+      sortAsc = (col === 'pos_ai' || col === 'pos_af' || col === 'nome');
+    }
+    applySort();
+    applyFilter();
+  });
+  applySort();
+  applyFilter();
+}
+
+/** Ordenação por clique em th.sortable[data-col] (usa data-* nas linhas). */
+function bindSortableTableHeaders(table, opts = {}) {
+  if (!table) return;
+  const tbody = table.tBodies[0];
+  const thead = table.tHead;
+  if (!tbody || !thead) return;
+
+  let sortCol = opts.defaultCol || thead.querySelector('th.sortable')?.dataset.col || null;
+  let sortAsc = opts.defaultAsc !== undefined ? opts.defaultAsc : true;
+  const ascDefault = new Set(opts.ascCols || ['pos', 'pos_ai', 'pos_af', 'nome', 'rank_pop']);
+
+  const paint = () => {
+    thead.querySelectorAll('th.sortable').forEach(th => {
+      const ind = th.querySelector('.sort-ind');
+      if (!ind) return;
+      if (th.dataset.col === sortCol) {
+        ind.textContent = sortAsc ? '▲' : '▼';
+        ind.style.opacity = '1';
+      } else {
+        ind.textContent = '↕';
+        ind.style.opacity = '.55';
+      }
+    });
+  };
+
+  const applySort = () => {
+    const rows = [...tbody.querySelectorAll('tr')];
+    rows.sort((a, b) => {
+      if (sortCol === 'nome') {
+        const va = a.dataset.nome || '';
+        const vb = b.dataset.nome || '';
+        return sortAsc ? va.localeCompare(vb, 'pt-BR') : vb.localeCompare(va, 'pt-BR');
+      }
+      const rawA = a.dataset[sortCol];
+      const rawB = b.dataset[sortCol];
+      const emptyA = rawA === '' || rawA == null;
+      const emptyB = rawB === '' || rawB == null;
+      if (emptyA && emptyB) return 0;
+      if (emptyA) return 1;
+      if (emptyB) return -1;
+      const va = parseFloat(rawA);
+      const vb = parseFloat(rawB);
+      return sortAsc ? va - vb : vb - va;
+    });
+    rows.forEach(tr => tbody.appendChild(tr));
+    paint();
+  };
+
+  thead.addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const col = th.dataset.col;
+    if (sortCol === col) sortAsc = !sortAsc;
+    else {
+      sortCol = col;
+      sortAsc = ascDefault.has(col);
+    }
+    applySort();
+  });
+  paint();
+}
+
+function bindIdebContrasteTables() {
+  bindSortableTableHeaders(document.getElementById('ideb-sc-ai-table'), { defaultCol: 'pos', defaultAsc: true });
+  bindSortableTableHeaders(document.getElementById('ideb-sc-af-table'), { defaultCol: 'pos', defaultAsc: true });
+  bindSortableTableHeaders(document.getElementById('ideb-top10-table'), { defaultCol: 'rank_pop', defaultAsc: true });
 }
 
 // Metas IDEB projetadas pela SEDUC-RS (2023–2035) — destrinchadas por etapa
@@ -6527,7 +6681,10 @@ function renderIdeb() {
   bindTopbarFilters();
   bindRedeToggle();
   updateActiveFilters();
-  if (JV_MODE) bindIdebFullRankingFilters();
+  if (JV_MODE) {
+    bindIdebContrasteTables();
+    bindIdebFullRankingFilters();
+  }
   // Garante ano no banner mesmo se algum gráfico falhar acima
   const selAnoFinal = document.getElementById('sel-ano');
   if (selAnoFinal && !selAnoFinal.options.length) {
