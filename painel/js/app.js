@@ -5419,7 +5419,140 @@ function buildIdebRankingHTML(ideb) {
         </table>
       </div>
       <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP 2023 (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10</div>
+    </div>
+
+    ${buildIdebFullRankingTableHTML(ideb)}`;
+}
+
+/** Tabelona: ranking completo SC (rede municipal) + filtro 10 maiores. */
+function buildIdebFullRankingTableHTML(ideb) {
+  const rk = ideb?.rankings;
+  if (!rk) return '';
+  const ano = rk.ano || '2023';
+  const ai = rk.sc_geral?.AI || [];
+  const af = rk.sc_geral?.AF || [];
+  const jvAI = rk.sc_geral?.joinville_AI?.ideb;
+  const jvAF = rk.sc_geral?.joinville_AF?.ideb;
+  const top10 = rk.top10_cidades?.linhas || [];
+  const top10Codes = new Set(top10.map(r => r.cod));
+  const popMap = Object.fromEntries(top10.map(r => [r.cod, r.populacao]));
+
+  const byCod = {};
+  for (const r of ai) {
+    byCod[r.cod] = {
+      cod: r.cod, nome: r.nome,
+      pos_ai: r.posicao, ideb_ai: r.ideb,
+      pos_af: null, ideb_af: null,
+    };
+  }
+  for (const r of af) {
+    if (!byCod[r.cod]) {
+      byCod[r.cod] = { cod: r.cod, nome: r.nome, pos_ai: null, ideb_ai: null, pos_af: null, ideb_af: null };
+    }
+    byCod[r.cod].pos_af = r.posicao;
+    byCod[r.cod].ideb_af = r.ideb;
+  }
+
+  const rows = Object.values(byCod)
+    .map(r => ({
+      ...r,
+      is_top10: top10Codes.has(r.cod),
+      populacao: popMap[r.cod] || null,
+      delta_ai: (jvAI != null && r.ideb_ai != null) ? +(r.ideb_ai - jvAI).toFixed(1) : null,
+      delta_af: (jvAF != null && r.ideb_af != null) ? +(r.ideb_af - jvAF).toFixed(1) : null,
+    }))
+    .sort((a, b) => {
+      const pa = a.pos_ai ?? 9999;
+      const pb = b.pos_ai ?? 9999;
+      if (pa !== pb) return pa - pb;
+      return (a.pos_af ?? 9999) - (b.pos_af ?? 9999);
+    });
+
+  const th = (txt, align = 'left') =>
+    `<th style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2">${txt}</th>`;
+  const fmtIdeb = v => (v == null ? '—' : String(v).replace('.', ','));
+
+  const body = rows.map(r => {
+    const isJv = r.cod === '4209102';
+    const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
+    const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return `<tr data-top10="${r.is_top10 ? '1' : '0'}" data-nome="${nomeNorm}" style="${bg}">
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1a365d">${r.pos_ai ?? '—'}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px">${isJv ? `<strong>${r.nome}</strong>` : r.nome}${r.is_top10 ? ' <span style="font-size:9px;color:#888;font-weight:600">(top 10 pop.)</span>' : ''}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_ai)}">${fmtIdeb(r.ideb_ai)}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px">${fmtIdebDelta(isJv ? 0 : r.delta_ai)}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1565C0">${r.pos_af ?? '—'}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_af)}">${fmtIdeb(r.ideb_af)}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px">${fmtIdebDelta(isJv ? 0 : r.delta_af)}</td>
+      <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-size:10px;color:#666">${r.populacao ? r.populacao.toLocaleString('pt-BR') : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="section-divider" style="margin-top:14px">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Ranking completo — Santa Catarina (${ano})</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div class="chart-card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div class="chart-title" style="margin:0">Todos os municípios · rede municipal</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+            Recorte
+            <select id="ideb-rank-full-filtro" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
+              <option value="todos" selected>Todos os municípios de SC</option>
+              <option value="top10">Só as 10 maiores cidades</option>
+            </select>
+          </label>
+          <input type="text" id="ideb-rank-full-search" placeholder="Buscar município..."
+            style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #ccc;font-family:Inter;min-width:180px">
+          <span id="ideb-rank-full-count" style="font-size:10.5px;color:#666;white-space:nowrap"></span>
+        </div>
+      </div>
+      <div style="max-height:480px;overflow:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:780px" id="ideb-rank-full-table">
+          <thead><tr>
+            ${th('# AI', 'center')}${th('Município')}${th('IDEB AI', 'center')}${th('Δ AI', 'center')}
+            ${th('# AF', 'center')}${th('IDEB AF', 'center')}${th('Δ AF', 'center')}${th('Hab.', 'right')}
+          </tr></thead>
+          <tbody id="ideb-rank-full-tbody">${body}</tbody>
+        </table>
+      </div>
+      <div class="chart-source" style="padding:8px 12px">
+        Fonte: IDEB/INEP ${ano} (VL_OBSERVADO, rede municipal) · Δ = diferença vs Joinville · Hab. só nas 10 maiores (IBGE 2025)
+      </div>
     </div>`;
+}
+
+function bindIdebFullRankingFilters() {
+  const filtro = document.getElementById('ideb-rank-full-filtro');
+  const search = document.getElementById('ideb-rank-full-search');
+  const tbody = document.getElementById('ideb-rank-full-tbody');
+  const countEl = document.getElementById('ideb-rank-full-count');
+  if (!filtro || !tbody) return;
+
+  const apply = () => {
+    const mode = filtro.value;
+    const q = (search?.value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    let visible = 0;
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const top10Ok = mode === 'todos' || tr.dataset.top10 === '1';
+      const nomeOk = !q || (tr.dataset.nome || '').includes(q);
+      const show = top10Ok && nomeOk;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (countEl) {
+      countEl.textContent = mode === 'top10'
+        ? `${visible} cidade${visible !== 1 ? 's' : ''} (10 maiores)`
+        : `${visible} município${visible !== 1 ? 's' : ''}`;
+    }
+  };
+  filtro.addEventListener('change', apply);
+  search?.addEventListener('input', apply);
+  apply();
 }
 
 // Metas IDEB projetadas pela SEDUC-RS (2023–2035) — destrinchadas por etapa
@@ -5916,9 +6049,11 @@ function renderIdeb() {
         plugins: {
           ...CHART_DEFAULTS.plugins,
           legend: {
-            display: !JV_MODE, position: 'bottom',
+            display: true, position: 'bottom',
+            onClick: () => {}, // visível, mas não clicável — filtros pelos menus
             labels: {
               font: { family: 'Inter', size: 11, weight: '600' }, boxWidth: 12, padding: 10, usePointStyle: true,
+              filter: (item, chartData) => !chartData.datasets[item.datasetIndex]?.hidden,
             },
           },
           datalabels: {
@@ -6007,7 +6142,14 @@ function renderIdeb() {
             maintainAspectRatio: false,
             layout: { padding: { top: 28, right: 8, bottom: 4, left: 4 } },
             plugins: {
-              legend: { display: false },
+              legend: {
+                display: true, position: 'bottom',
+                onClick: () => {},
+                labels: {
+                  font: { family: 'Inter', size: 11, weight: '600' }, boxWidth: 12, padding: 10, usePointStyle: true,
+                  filter: (item, chartData) => !chartData.datasets[item.datasetIndex]?.hidden,
+                },
+              },
               tooltip: {
                 backgroundColor: '#1A2332',
                 titleFont: { family: 'Inter', size: 11, weight: '600' },
@@ -6024,7 +6166,7 @@ function renderIdeb() {
                 },
               },
               datalabels: {
-                display: true,
+                display: ctx => !ctx.dataset.hidden,
                 clamp: true,
                 clip: false,
                 anchor: 'end',
@@ -6385,6 +6527,7 @@ function renderIdeb() {
   bindTopbarFilters();
   bindRedeToggle();
   updateActiveFilters();
+  if (JV_MODE) bindIdebFullRankingFilters();
   // Garante ano no banner mesmo se algum gráfico falhar acima
   const selAnoFinal = document.getElementById('sel-ano');
   if (selAnoFinal && !selAnoFinal.options.length) {
