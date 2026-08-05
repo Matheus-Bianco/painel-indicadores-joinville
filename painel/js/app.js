@@ -5276,6 +5276,133 @@ function getIdebColor(v) {
   return '#E53935';
 }
 
+/** Formata Δ IDEB com cor semântica (contraste vs Joinville). */
+function fmtIdebDelta(d) {
+  if (d == null || Number.isNaN(d)) return '<span style="color:#999">—</span>';
+  if (d === 0) return '<span style="color:#666;font-weight:600">0,0</span>';
+  const cls = d > 0 ? '#C62828' : '#2E7D32'; // acima de JV = vermelho (eles melhores); abaixo = verde (JV à frente)
+  const sign = d > 0 ? '+' : '';
+  return `<span style="color:${cls};font-weight:700">${sign}${d.toFixed(1).replace('.', ',')}</span>`;
+}
+
+/**
+ * Tabelas de contraste IDEB para o secretário (JV_MODE):
+ * ranking SC geral + ranking nas 10 maiores cidades.
+ */
+function buildIdebRankingHTML(ideb) {
+  const rk = ideb?.rankings;
+  if (!rk) return '';
+  const ano = rk.ano || '2023';
+  const jvAI = rk.sc_geral?.joinville_AI || {};
+  const jvAF = rk.sc_geral?.joinville_AF || {};
+  const top10 = rk.top10_cidades?.linhas || [];
+  const jvTop = rk.top10_cidades?.joinville || {};
+
+  const th = (txt, align = 'left') =>
+    `<th style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap">${txt}</th>`;
+  const td = (html, align = 'left', extra = '') =>
+    `<td style="padding:6px 8px;text-align:${align};border-bottom:1px solid #eee;font-size:11px;${extra}">${html}</td>`;
+
+  // ── SC geral: contraste AI e AF lado a lado (top 12 + Joinville) ──
+  const buildScTable = (et) => {
+    const rows = rk.sc_geral?.[`contraste_${et}`] || rk.sc_geral?.[et]?.slice(0, 15) || [];
+    const jvInfo = et === 'AI' ? jvAI : jvAF;
+    const jvIdeb = jvInfo.ideb;
+    const body = rows.map(r => {
+      const isJv = r.cod === '4209102';
+      const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
+      const delta = (jvIdeb != null && r.ideb != null) ? +(r.ideb - jvIdeb).toFixed(1) : null;
+      return `<tr style="${bg}">
+        ${td(r.posicao, 'center', 'font-weight:700;color:#1a365d')}
+        ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
+        ${td((r.ideb ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb)}`)}
+        ${td(fmtIdebDelta(isJv ? 0 : delta), 'center')}
+      </tr>`;
+    }).join('');
+    return `
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div class="chart-title" style="margin:0">Ranking SC — ${et === 'AI' ? 'Anos Iniciais' : 'Anos Finais'} (${ano})</div>
+          <div style="font-size:10.5px;color:#555;white-space:nowrap">
+            Joinville: <strong style="color:#1a365d">${(jvInfo.ideb ?? '—').toString().replace('.', ',')}</strong>
+            · <strong>${jvInfo.posicao ?? '—'}º</strong> de ${jvInfo.n_municipios ?? '—'}
+          </div>
+        </div>
+        <div style="max-height:340px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>${th('#', 'center')}${th('Município')}${th('IDEB', 'center')}${th('Δ vs Joinville', 'center')}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+        <div class="chart-source" style="padding:8px 12px">Fonte: IDEB/INEP — rede municipal · Top do ranking + posição de Joinville</div>
+      </div>`;
+  };
+
+  // ── 10 maiores cidades ──
+  const topBody = top10.map(r => {
+    const isJv = r.cod === '4209102';
+    const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
+    const pop = (r.populacao || 0).toLocaleString('pt-BR');
+    return `<tr style="${bg}">
+      ${td(r.rank_pop, 'center', 'color:#666')}
+      ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
+      ${td(pop, 'right', 'color:#666;font-size:10px')}
+      ${td(r.posicao_top10_ai ?? '—', 'center', 'font-weight:700;color:#1a365d')}
+      ${td((r.ideb_ai ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
+      ${td(fmtIdebDelta(isJv ? 0 : r.delta_ai_vs_joinville), 'center')}
+      ${td(r.posicao_top10_af ?? '—', 'center', 'font-weight:700;color:#1565C0')}
+      ${td((r.ideb_af ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb_af)}`)}
+      ${td(fmtIdebDelta(isJv ? 0 : r.delta_af_vs_joinville), 'center')}
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Ranking e contrastes — Secretário (${ano})</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="kpi-card accent-green" style="padding:12px 16px">
+        <div class="kpi-label">Posição em SC — Anos Iniciais</div>
+        <div class="kpi-value" style="font-size:1.6rem">${jvAI.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAI.n_municipios ?? '—'}</span></div>
+        <div class="kpi-footer"><span>IDEB ${(jvAI.ideb ?? '—').toString().replace('.', ',')}</span><span class="kpi-abs">rede municipal</span></div>
+      </div>
+      <div class="kpi-card accent-blue" style="padding:12px 16px">
+        <div class="kpi-label">Posição em SC — Anos Finais</div>
+        <div class="kpi-value" style="font-size:1.6rem">${jvAF.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAF.n_municipios ?? '—'}</span></div>
+        <div class="kpi-footer"><span>IDEB ${(jvAF.ideb ?? '—').toString().replace('.', ',')}</span><span class="kpi-abs">rede municipal</span></div>
+      </div>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${buildScTable('AI')}
+      ${buildScTable('AF')}
+    </div>
+
+    <div class="chart-card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="chart-title" style="margin:0">Contraste — 10 maiores cidades de SC</div>
+        <div style="font-size:10.5px;color:#555">
+          Entre as 10: AI <strong>${jvTop.posicao_top10_ai ?? '—'}º</strong> · AF <strong>${jvTop.posicao_top10_af ?? '—'}º</strong>
+          <span style="color:#999"> · Δ: positivo = cidade acima de Joinville</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:720px">
+          <thead><tr>
+            ${th('Pop.', 'center')}${th('Município')}${th('Hab.', 'right')}
+            ${th('Pos. AI', 'center')}${th('IDEB AI', 'center')}${th('Δ AI', 'center')}
+            ${th('Pos. AF', 'center')}${th('IDEB AF', 'center')}${th('Δ AF', 'center')}
+          </tr></thead>
+          <tbody>${topBody}</tbody>
+        </table>
+      </div>
+      <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP 2023 (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10</div>
+    </div>`;
+}
+
 // Metas IDEB projetadas pela SEDUC-RS (2023–2035) — destrinchadas por etapa
 const METAS_SEDUC = {
   AI: { 2023: 5.8, 2024: 6.0, 2025: 6.11, 2026: 6.20, 2027: 6.26, 2028: 6.34, 2029: 6.43, 2030: 6.52, 2031: 6.58, 2032: 6.63, 2033: 6.66, 2034: 6.68, 2035: 6.69 },
@@ -5555,6 +5682,8 @@ function renderIdeb() {
       </div>
     </div>
 
+    ${JV_MODE ? buildIdebRankingHTML(ideb) : ''}
+
     ${isStateLevel ? `
     <!-- ═══ EIXO: Decomposição N × P ═══ -->
     <div class="section-divider">
@@ -5696,8 +5825,8 @@ function renderIdeb() {
       // Referências: IDEB médio das redes municipais (SC e Brasil) — ocultas por padrão (toggle na legenda)
       if (JV_MODE && ideb.referencias) {
         const refScopes = [
-          { key: 'sc_municipal', label: 'SC munic.', dash: [7, 4] },
-          { key: 'brasil_municipal', label: 'Brasil munic.', dash: [2, 3] },
+          { key: 'sc_municipal', label: 'SC pública', dash: [7, 4] },
+          { key: 'brasil_municipal', label: 'Brasil pública', dash: [2, 3] },
         ];
         refScopes.forEach(sc => {
           datasets.push({
