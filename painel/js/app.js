@@ -5289,6 +5289,25 @@ function fmtIdebDelta(d) {
  * Tabelas de contraste IDEB para o secretário (JV_MODE):
  * ranking SC geral + ranking nas 10 maiores cidades.
  */
+/** Posição de Joinville em SC (rede municipal) por ano e etapa — a partir de por_municipio. */
+function computeIdebPosicaoSerie(ideb, etapa) {
+  const anos = Object.keys(ideb?.por_municipio || {}).sort();
+  return anos.map(ano => {
+    const munMap = ideb.por_municipio[ano] || {};
+    const rows = Object.entries(munMap)
+      .filter(([, m]) => m[etapa]?.ideb != null)
+      .map(([cod, m]) => ({ cod, ideb: m[etapa].ideb, nome: ideb.lookup_municipios?.[cod] || cod }))
+      .sort((a, b) => (b.ideb - a.ideb) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const idx = rows.findIndex(r => r.cod === '4209102');
+    return {
+      ano,
+      posicao: idx >= 0 ? idx + 1 : null,
+      n_municipios: rows.length,
+      ideb: idx >= 0 ? rows[idx].ideb : null,
+    };
+  });
+}
+
 function buildIdebRankingHTML(ideb) {
   const rk = ideb?.rankings;
   if (!rk) return '';
@@ -5359,7 +5378,7 @@ function buildIdebRankingHTML(ideb) {
   return `
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
-      <span class="section-divider-text">Ranking e contrastes — Secretário (${ano})</span>
+      <span class="section-divider-text">Ranking e contrastes (${ano})</span>
       <span class="section-divider-line"></span>
     </div>
 
@@ -5670,17 +5689,60 @@ function renderIdeb() {
     <!-- ═══ EIXO: Evolução ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_evolucao.png" alt=""></span>
-      <span class="section-divider-text">IDEB — Evolução por Etapa (${anos[0]}–2027)</span>
+      <span class="section-divider-text">IDEB — Evolução por Etapa (${anos[0]}–${anos[anos.length - 1]})</span>
       <span class="section-divider-line"></span>
     </div>
 
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
       <div class="chart-card">
-        <div class="chart-title">${JV_MODE ? 'IDEB — Evolução por Etapa' : 'IDEB Observado × Meta SEDUC-RS'} — ${geoLabel}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <div class="chart-title" style="margin:0">${JV_MODE ? 'IDEB — Evolução por Etapa' : 'IDEB Observado × Meta SEDUC-RS'} — ${geoLabel}</div>
+          ${JV_MODE ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+              Etapas
+              <select id="ideb-evo-etapas" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
+                <option value="ambas" selected>Anos Iniciais + Finais</option>
+                <option value="AI">Só Anos Iniciais</option>
+                <option value="AF">Só Anos Finais</option>
+              </select>
+            </label>
+            <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+              Comparar com
+              <select id="ideb-evo-ref" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
+                <option value="nenhuma" selected>Nenhuma referência</option>
+                <option value="sc">SC pública</option>
+                <option value="br">Brasil pública</option>
+                <option value="ambas">SC + Brasil</option>
+              </select>
+            </label>
+          </div>` : ''}
+        </div>
         <div style="height:360px"><canvas id="chart-ideb-evolucao"></canvas></div>
         <div class="chart-source">${FONTE_IDEB}</div>
       </div>
     </div>
+
+    ${JV_MODE ? `
+    <div class="chart-card" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="chart-title" style="margin:0">Posição de Joinville em SC — ranking temporal (${anos[0]}–${anos[anos.length - 1]})</div>
+        <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+          Etapa
+          <select id="ideb-rank-etapas" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
+            <option value="ambas" selected>Anos Iniciais + Finais</option>
+            <option value="AI">Só Anos Iniciais</option>
+            <option value="AF">Só Anos Finais</option>
+          </select>
+        </label>
+      </div>
+      <p style="font-size:10.5px;color:#666;margin:0 0 8px;line-height:1.45">
+        Posição entre os municípios de SC com IDEB publicado na rede municipal (1º = melhor).
+        O eixo é invertido: quanto mais alta a linha, melhor a colocação.
+      </p>
+      <div style="height:300px"><canvas id="chart-ideb-ranking-temporal"></canvas></div>
+      <div class="chart-source">${FONTE_IDEB} · Ranking calculado sobre VL_OBSERVADO municipal (SC)</div>
+    </div>` : ''}
 
     ${JV_MODE ? buildIdebRankingHTML(ideb) : ''}
 
@@ -5805,7 +5867,7 @@ function renderIdeb() {
         return gd?.[et]?.ideb ?? null;
       });
       datasets.push({
-        label: idebLabels[etIdx], data: dataObs, _isMeta: false, _etIdx: etIdx, _isSeduc: false,
+        label: idebLabels[etIdx], data: dataObs, _isMeta: false, _etIdx: etIdx, _isSeduc: false, _etapa: et,
         borderColor: idebCores[etIdx], backgroundColor: idebCores[etIdx] + '18',
         borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
         tension: .3, spanGaps: true,
@@ -5815,24 +5877,24 @@ function renderIdeb() {
         const dataMeta = chartLabels.map(a => METAS_SEDUC[et]?.[parseInt(a)] ?? null);
         if (dataMeta.some(v => v != null)) {
           datasets.push({
-            label: `Meta SEDUC ${idebLabels[etIdx]}`, data: dataMeta, _isMeta: true, _etIdx: etIdx, _isSeduc: true,
+            label: `Meta SEDUC ${idebLabels[etIdx]}`, data: dataMeta, _isMeta: true, _etIdx: etIdx, _isSeduc: true, _etapa: et,
             borderColor: idebCores[etIdx] + '70', borderWidth: 1.8, borderDash: [6, 4],
             pointRadius: 3, pointBackgroundColor: idebCores[etIdx] + '55',
             pointStyle: 'triangle', tension: .3, spanGaps: true,
           });
         }
       }
-      // Referências: IDEB médio das redes municipais (SC e Brasil) — ocultas por padrão (toggle na legenda)
+      // Referências SC / Brasil — controladas por menu suspenso (não pela legenda)
       if (JV_MODE && ideb.referencias) {
         const refScopes = [
-          { key: 'sc_municipal', label: 'SC pública', dash: [7, 4] },
-          { key: 'brasil_municipal', label: 'Brasil pública', dash: [2, 3] },
+          { key: 'sc_municipal', refTag: 'sc', label: 'SC pública', dash: [7, 4] },
+          { key: 'brasil_municipal', refTag: 'br', label: 'Brasil pública', dash: [2, 3] },
         ];
         refScopes.forEach(sc => {
           datasets.push({
-            label: `${idebLabels[etIdx]} — ${sc.label} (ref.)`,
+            label: `${idebLabels[etIdx]} — ${sc.label}`,
             data: chartLabels.map(a => ideb.referencias[sc.key]?.[a]?.[et] ?? null),
-            _isMeta: true, _etIdx: etIdx, _isSeduc: false,
+            _isMeta: true, _etIdx: etIdx, _isSeduc: false, _etapa: et, _refTag: sc.refTag,
             borderColor: idebCores[etIdx], borderDash: sc.dash, borderWidth: 1.6,
             pointRadius: 0, tension: .3, spanGaps: true, hidden: true,
             datalabels: { display: false },
@@ -5840,7 +5902,7 @@ function renderIdeb() {
         });
       }
     });
-    S.charts.push(new Chart(elEvo, {
+    const evoChart = new Chart(elEvo, {
       type: 'line',
       data: { labels: chartLabels, datasets },
       options: {
@@ -5848,17 +5910,13 @@ function renderIdeb() {
         plugins: {
           ...CHART_DEFAULTS.plugins,
           legend: {
-            display: true, position: 'bottom',
+            display: !JV_MODE, position: 'bottom',
             labels: {
               font: { family: 'Inter', size: 11, weight: '600' }, boxWidth: 12, padding: 10, usePointStyle: true,
-              filter: item => {
-                // Show meta only once in legend (not per-etapa)
-                return true;
-              },
             },
           },
           datalabels: {
-            display: ctx => !ctx.dataset._isMeta,
+            display: ctx => !ctx.dataset._isMeta && !ctx.dataset.hidden,
             anchor: ctx => ctx.dataset._etIdx === 2 ? 'start' : 'end',
             align: ctx => ctx.dataset._etIdx === 2 ? 'bottom' : 'top',
             offset: 4,
@@ -5869,7 +5927,115 @@ function renderIdeb() {
         },
         scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, beginAtZero: false, min: 2, suggestedMax: 8 } },
       },
-    }));
+    });
+    S.charts.push(evoChart);
+
+    // Menus suspensos (JV): etapas + referência
+    if (JV_MODE) {
+      const applyEvoFilters = () => {
+        const etSel = document.getElementById('ideb-evo-etapas')?.value || 'ambas';
+        const refSel = document.getElementById('ideb-evo-ref')?.value || 'nenhuma';
+        evoChart.data.datasets.forEach(ds => {
+          const etOk = etSel === 'ambas' || ds._etapa === etSel;
+          if (!ds._isMeta) {
+            ds.hidden = !etOk;
+          } else {
+            const refOk = refSel === 'ambas'
+              || (refSel === 'sc' && ds._refTag === 'sc')
+              || (refSel === 'br' && ds._refTag === 'br');
+            ds.hidden = !(etOk && refOk && refSel !== 'nenhuma');
+          }
+        });
+        evoChart.update();
+      };
+      document.getElementById('ideb-evo-etapas')?.addEventListener('change', applyEvoFilters);
+      document.getElementById('ideb-evo-ref')?.addEventListener('change', applyEvoFilters);
+      applyEvoFilters();
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  CHART: Ranking temporal — posição de Joinville em SC
+  // ════════════════════════════════════════════════════════════════
+  const elRank = document.getElementById('chart-ideb-ranking-temporal');
+  if (elRank && JV_MODE) {
+    const posAI = computeIdebPosicaoSerie(ideb, 'AI');
+    const posAF = computeIdebPosicaoSerie(ideb, 'AF');
+    const anosRank = posAI.map(r => r.ano);
+    const maxN = Math.max(
+      ...posAI.map(r => r.n_municipios || 0),
+      ...posAF.map(r => r.n_municipios || 0),
+      10,
+    );
+    const rankChart = new Chart(elRank, {
+      type: 'line',
+      data: {
+        labels: anosRank,
+        datasets: [
+          {
+            label: 'Anos Iniciais', _etapa: 'AI',
+            data: posAI.map(r => r.posicao),
+            borderColor: COLORS.pri, backgroundColor: COLORS.pri,
+            borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
+            tension: .3, spanGaps: true,
+          },
+          {
+            label: 'Anos Finais', _etapa: 'AF',
+            data: posAF.map(r => r.posicao),
+            borderColor: '#1565C0', backgroundColor: '#1565C0',
+            borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
+            tension: .3, spanGaps: true,
+          },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        layout: { padding: { top: 22 } },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              label: ctx => {
+                const serie = ctx.dataset._etapa === 'AI' ? posAI : posAF;
+                const row = serie[ctx.dataIndex];
+                if (!row?.posicao) return ` ${ctx.dataset.label}: —`;
+                return ` ${ctx.dataset.label}: ${row.posicao}º de ${row.n_municipios} (IDEB ${row.ideb?.toFixed(1)?.replace('.', ',')})`;
+              },
+            },
+          },
+          datalabels: {
+            display: ctx => !ctx.dataset.hidden && ctx.parsed.y != null,
+            anchor: 'end', align: 'top', offset: 3,
+            font: { family: 'Inter', size: 10, weight: '700' },
+            color: ctx => ctx.dataset.borderColor,
+            formatter: v => (v != null ? v + 'º' : ''),
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 } } },
+          y: {
+            reverse: true,
+            min: 1,
+            suggestedMax: Math.min(maxN, 80),
+            title: { display: true, text: 'Posição em SC (1º = melhor)', font: { family: 'Inter', size: 10 }, color: '#666' },
+            grid: { color: 'rgba(0,0,0,.06)' },
+            ticks: { font: { family: 'Inter', size: 9 }, callback: v => v + 'º' },
+          },
+        },
+      },
+    });
+    S.charts.push(rankChart);
+
+    const applyRankFilter = () => {
+      const etSel = document.getElementById('ideb-rank-etapas')?.value || 'ambas';
+      rankChart.data.datasets.forEach(ds => {
+        ds.hidden = !(etSel === 'ambas' || ds._etapa === etSel);
+      });
+      rankChart.update();
+    };
+    document.getElementById('ideb-rank-etapas')?.addEventListener('change', applyRankFilter);
   }
 
   // ════════════════════════════════════════════════════════════════
