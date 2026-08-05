@@ -5308,10 +5308,110 @@ function computeIdebPosicaoSerie(ideb, etapa) {
   });
 }
 
-function buildIdebRankingHTML(ideb) {
-  const rk = ideb?.rankings;
-  if (!rk) return '';
-  const ano = rk.ano || '2023';
+/** Ranking SC (AI/AF) + top 10 para um ano — usa por_municipio (respeita Ano de Referência). */
+function computeIdebRankingsForYear(ideb, ano) {
+  const anoKey = String(ano);
+  const munMap = ideb?.por_municipio?.[anoKey] || {};
+  const lookup = ideb?.lookup_municipios || {};
+  const jvCod = '4209102';
+
+  const rankEtapa = (et) => {
+    const rows = Object.entries(munMap)
+      .filter(([, m]) => m[et]?.ideb != null)
+      .map(([cod, m]) => ({
+        cod,
+        nome: lookup[cod] || cod,
+        ideb: m[et].ideb,
+      }))
+      .sort((a, b) => (b.ideb - a.ideb) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    rows.forEach((r, i) => { r.posicao = i + 1; });
+    return rows;
+  };
+
+  const ai = rankEtapa('AI');
+  const af = rankEtapa('AF');
+  const jvAI = ai.find(r => r.cod === jvCod) || null;
+  const jvAF = af.find(r => r.cod === jvCod) || null;
+
+  const contraste = (rows) => {
+    const top15 = rows.slice(0, 15);
+    if (!top15.some(r => r.cod === jvCod) && jvCod) {
+      const jv = rows.find(r => r.cod === jvCod);
+      if (jv) top15.push(jv);
+    }
+    return top15;
+  };
+
+  // Base populacional fixa (IBGE 2025) — vem do bloco rankings do ETL
+  const top10Base = (ideb?.rankings?.top10_cidades?.linhas || []).map(r => ({
+    rank_pop: r.rank_pop,
+    cod: r.cod,
+    nome: r.nome || lookup[r.cod] || r.cod,
+    populacao: r.populacao,
+  }));
+  const lookupAI = Object.fromEntries(ai.map(r => [r.cod, r]));
+  const lookupAF = Object.fromEntries(af.map(r => [r.cod, r]));
+  const jvIdebAI = jvAI?.ideb ?? null;
+  const jvIdebAF = jvAF?.ideb ?? null;
+
+  const topRows = top10Base.map(t => {
+    const rAI = lookupAI[t.cod];
+    const rAF = lookupAF[t.cod];
+    return {
+      ...t,
+      ideb_ai: rAI?.ideb ?? null,
+      ideb_af: rAF?.ideb ?? null,
+      posicao_sc_ai: rAI?.posicao ?? null,
+      posicao_sc_af: rAF?.posicao ?? null,
+      delta_ai_vs_joinville: (rAI && jvIdebAI != null) ? +(rAI.ideb - jvIdebAI).toFixed(1) : null,
+      delta_af_vs_joinville: (rAF && jvIdebAF != null) ? +(rAF.ideb - jvIdebAF).toFixed(1) : null,
+    };
+  });
+
+  for (const [field, posKey] of [['ideb_ai', 'posicao_top10_ai'], ['ideb_af', 'posicao_top10_af']]) {
+    const ranked = topRows
+      .filter(r => r[field] != null)
+      .sort((a, b) => (b[field] - a[field]) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const pos = Object.fromEntries(ranked.map((r, i) => [r.cod, i + 1]));
+    topRows.forEach(r => { r[posKey] = pos[r.cod] ?? null; });
+  }
+
+  return {
+    ano: Number(anoKey) || anoKey,
+    rede: 'Municipal',
+    sc_geral: {
+      AI: ai,
+      AF: af,
+      contraste_AI: contraste(ai),
+      contraste_AF: contraste(af),
+      joinville_AI: {
+        posicao: jvAI?.posicao ?? null,
+        ideb: jvAI?.ideb ?? null,
+        n_municipios: ai.length,
+      },
+      joinville_AF: {
+        posicao: jvAF?.posicao ?? null,
+        ideb: jvAF?.ideb ?? null,
+        n_municipios: af.length,
+      },
+    },
+    top10_cidades: {
+      criterio_pop: ideb?.rankings?.top10_cidades?.criterio_pop || 'IBGE Estimativa população residente 1º jul/2025',
+      linhas: topRows,
+      joinville: topRows.find(r => r.cod === jvCod) || null,
+    },
+  };
+}
+
+function fmtIdebNum(v) {
+  return v == null || v === '' ? '—' : Number(v).toFixed(1).replace('.', ',');
+}
+
+function buildIdebRankingHTML(ideb, anoSel) {
+  const anosDisp = Object.keys(ideb?.por_municipio || {}).sort();
+  const ano = anosDisp.includes(String(anoSel)) ? String(anoSel) : (anosDisp[anosDisp.length - 1] || '2023');
+  const rk = computeIdebRankingsForYear(ideb, ano);
+  if (!rk.sc_geral?.AI?.length && !rk.sc_geral?.AF?.length) return '';
   const jvAI = rk.sc_geral?.joinville_AI || {};
   const jvAF = rk.sc_geral?.joinville_AF || {};
   const top10 = rk.top10_cidades?.linhas || [];
@@ -5337,7 +5437,7 @@ function buildIdebRankingHTML(ideb) {
         data-ideb="${r.ideb ?? ''}" data-delta="${isJv ? 0 : (delta ?? '')}">
         ${td(r.posicao, 'center', 'font-weight:700;color:#1a365d')}
         ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
-        ${td((r.ideb ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb)}`)}
+        ${td(fmtIdebNum(r.ideb), 'center', `font-weight:700;color:${getIdebColor(r.ideb)}`)}
         ${td(fmtIdebDelta(isJv ? 0 : delta), 'center')}
       </tr>`;
     }).join('');
@@ -5346,7 +5446,7 @@ function buildIdebRankingHTML(ideb) {
         <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div class="chart-title" style="margin:0">Ranking SC — ${et === 'AI' ? 'Anos Iniciais' : 'Anos Finais'} (${ano})</div>
           <div style="font-size:10.5px;color:#555;white-space:nowrap">
-            Joinville: <strong style="color:#1a365d">${(jvInfo.ideb ?? '—').toString().replace('.', ',')}</strong>
+            Joinville: <strong style="color:#1a365d">${fmtIdebNum(jvInfo.ideb)}</strong>
             · <strong>${jvInfo.posicao ?? '—'}º</strong> de ${jvInfo.n_municipios ?? '—'}
           </div>
         </div>
@@ -5379,10 +5479,10 @@ function buildIdebRankingHTML(ideb) {
       ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
       ${td(pop, 'right', 'color:#666;font-size:10px')}
       ${td(r.posicao_top10_ai ?? '—', 'center', 'font-weight:700;color:#1a365d')}
-      ${td((r.ideb_ai ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
+      ${td(fmtIdebNum(r.ideb_ai), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
       ${td(fmtIdebDelta(isJv ? 0 : r.delta_ai_vs_joinville), 'center')}
       ${td(r.posicao_top10_af ?? '—', 'center', 'font-weight:700;color:#1565C0')}
-      ${td((r.ideb_af ?? '—').toString().replace('.', ','), 'center', `font-weight:700;color:${getIdebColor(r.ideb_af)}`)}
+      ${td(fmtIdebNum(r.ideb_af), 'center', `font-weight:700;color:${getIdebColor(r.ideb_af)}`)}
       ${td(fmtIdebDelta(isJv ? 0 : r.delta_af_vs_joinville), 'center')}
     </tr>`;
   }).join('');
@@ -5398,12 +5498,12 @@ function buildIdebRankingHTML(ideb) {
       <div class="kpi-card accent-green" style="padding:12px 16px">
         <div class="kpi-label">Posição em SC — Anos Iniciais</div>
         <div class="kpi-value" style="font-size:1.6rem">${jvAI.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAI.n_municipios ?? '—'}</span></div>
-        <div class="kpi-footer"><span>IDEB ${(jvAI.ideb ?? '—').toString().replace('.', ',')}</span><span class="kpi-abs">rede municipal</span></div>
+        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jvAI.ideb)}</span><span class="kpi-abs">rede municipal</span></div>
       </div>
       <div class="kpi-card accent-blue" style="padding:12px 16px">
         <div class="kpi-label">Posição em SC — Anos Finais</div>
         <div class="kpi-value" style="font-size:1.6rem">${jvAF.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAF.n_municipios ?? '—'}</span></div>
-        <div class="kpi-footer"><span>IDEB ${(jvAF.ideb ?? '—').toString().replace('.', ',')}</span><span class="kpi-abs">rede municipal</span></div>
+        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jvAF.ideb)}</span><span class="kpi-abs">rede municipal</span></div>
       </div>
     </div>
 
@@ -5436,15 +5536,14 @@ function buildIdebRankingHTML(ideb) {
           <tbody>${topBody}</tbody>
         </table>
       </div>
-      <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP 2023 (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10 · Clique nos cabeçalhos para ordenar</div>
+      <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP ${ano} (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10 · Clique nos cabeçalhos para ordenar</div>
     </div>
 
-    ${buildIdebFullRankingTableHTML(ideb)}`;
+    ${buildIdebFullRankingTableHTML(rk)}`;
 }
 
 /** Tabelona: ranking completo SC (rede municipal) + filtro 10 maiores. */
-function buildIdebFullRankingTableHTML(ideb) {
-  const rk = ideb?.rankings;
+function buildIdebFullRankingTableHTML(rk) {
   if (!rk) return '';
   const ano = rk.ano || '2023';
   const ai = rk.sc_geral?.AI || [];
@@ -5485,7 +5584,6 @@ function buildIdebFullRankingTableHTML(ideb) {
   const th = (col, txt, align = 'left', title = '') =>
     `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
       style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
-  const fmtIdeb = v => (v == null ? '—' : Number(v).toFixed(1).replace('.', ','));
 
   const body = rows.map(r => {
     const isJv = r.cod === '4209102';
@@ -5498,8 +5596,8 @@ function buildIdebFullRankingTableHTML(ideb) {
       <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1a365d">${r.pos_ai ?? '—'}</td>
       <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#1565C0">${r.pos_af ?? '—'}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px">${isJv ? `<strong>${r.nome}</strong>` : r.nome}${r.is_top10 ? ' <span style="font-size:9px;color:#888;font-weight:600">(top 10 pop.)</span>' : ''}</td>
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_ai)}">${fmtIdeb(r.ideb_ai)}</td>
-      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_af)}">${fmtIdeb(r.ideb_af)}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_ai)}">${fmtIdebNum(r.ideb_ai)}</td>
+      <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:${getIdebColor(r.ideb_af)}">${fmtIdebNum(r.ideb_af)}</td>
       <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-size:10px;color:#666">${r.populacao ? r.populacao.toLocaleString('pt-BR') : '—'}</td>
     </tr>`;
   }).join('');
@@ -6022,7 +6120,7 @@ function renderIdeb() {
       <div class="chart-source">${FONTE_IDEB} · Ranking calculado sobre VL_OBSERVADO municipal (SC)</div>
     </div>` : ''}
 
-    ${JV_MODE ? buildIdebRankingHTML(ideb) : ''}
+    ${JV_MODE ? buildIdebRankingHTML(ideb, anoSel) : ''}
 
     ${isStateLevel ? `
     <!-- ═══ EIXO: Decomposição N × P ═══ -->
