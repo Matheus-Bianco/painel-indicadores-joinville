@@ -5823,6 +5823,12 @@ function renderIdeb() {
     </div>`}
   `;
 
+  // ── Ano de referência no banner (antes dos gráficos — evita sumir se um chart falhar) ──
+  const selAnoEarly = document.getElementById('sel-ano');
+  if (selAnoEarly) {
+    selAnoEarly.innerHTML = anos.map(a => `<option value="${a}" ${a === anoSel ? 'selected' : ''}>${a}</option>`).join('');
+  }
+
   // ════════════════════════════════════════════════════════════════
   //  BUILD KPIs
   // ════════════════════════════════════════════════════════════════
@@ -5959,83 +5965,118 @@ function renderIdeb() {
   // ════════════════════════════════════════════════════════════════
   const elRank = document.getElementById('chart-ideb-ranking-temporal');
   if (elRank && JV_MODE) {
-    const posAI = computeIdebPosicaoSerie(ideb, 'AI');
-    const posAF = computeIdebPosicaoSerie(ideb, 'AF');
-    const anosRank = posAI.map(r => r.ano);
-    const maxN = Math.max(
-      ...posAI.map(r => r.n_municipios || 0),
-      ...posAF.map(r => r.n_municipios || 0),
-      10,
-    );
-    const rankChart = new Chart(elRank, {
-      type: 'line',
-      data: {
-        labels: anosRank,
-        datasets: [
-          {
-            label: 'Anos Iniciais', _etapa: 'AI',
-            data: posAI.map(r => r.posicao),
-            borderColor: COLORS.pri, backgroundColor: COLORS.pri,
-            borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
-            tension: .3, spanGaps: true,
+    try {
+      const posAI = computeIdebPosicaoSerie(ideb, 'AI');
+      const posAF = computeIdebPosicaoSerie(ideb, 'AF');
+      const anosRank = posAI.map(r => r.ano);
+      const maxPos = Math.max(
+        10,
+        ...posAI.map(r => r.posicao || 0),
+        ...posAF.map(r => r.posicao || 0),
+      );
+      const yMax = Math.max(15, Math.ceil(maxPos * 1.15));
+
+      if (!anosRank.length || posAI.every(r => r.posicao == null)) {
+        elRank.parentElement.innerHTML = '<p style="padding:24px;color:#888;font-size:12px;text-align:center">Não foi possível calcular o ranking temporal (dados por município indisponíveis).</p>';
+      } else {
+        const rankChart = new Chart(elRank, {
+          type: 'line',
+          data: {
+            labels: anosRank,
+            datasets: [
+              {
+                label: 'Anos Iniciais', _etapa: 'AI',
+                data: posAI.map(r => r.posicao),
+                borderColor: COLORS.pri, backgroundColor: COLORS.pri + '18',
+                borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff',
+                pointBorderColor: COLORS.pri, pointBorderWidth: 2,
+                tension: .25, spanGaps: true, fill: false,
+              },
+              {
+                label: 'Anos Finais', _etapa: 'AF',
+                data: posAF.map(r => r.posicao),
+                borderColor: '#1565C0', backgroundColor: '#1565C0' + '18',
+                borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff',
+                pointBorderColor: '#1565C0', pointBorderWidth: 2,
+                tension: .25, spanGaps: true, fill: false,
+              },
+            ],
           },
-          {
-            label: 'Anos Finais', _etapa: 'AF',
-            data: posAF.map(r => r.posicao),
-            borderColor: '#1565C0', backgroundColor: '#1565C0',
-            borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
-            tension: .3, spanGaps: true,
-          },
-        ],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        layout: { padding: { top: 22 } },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          legend: { display: false },
-          tooltip: {
-            ...CHART_DEFAULTS.plugins.tooltip,
-            callbacks: {
-              label: ctx => {
-                const serie = ctx.dataset._etapa === 'AI' ? posAI : posAF;
-                const row = serie[ctx.dataIndex];
-                if (!row?.posicao) return ` ${ctx.dataset.label}: —`;
-                return ` ${ctx.dataset.label}: ${row.posicao}º de ${row.n_municipios} (IDEB ${row.ideb?.toFixed(1)?.replace('.', ',')})`;
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 28, right: 8, bottom: 4, left: 4 } },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#1A2332',
+                titleFont: { family: 'Inter', size: 11, weight: '600' },
+                bodyFont: { family: 'Inter', size: 10 },
+                padding: 8, cornerRadius: 6,
+                callbacks: {
+                  label: ctx => {
+                    const serie = ctx.dataset._etapa === 'AI' ? posAI : posAF;
+                    const row = serie[ctx.dataIndex];
+                    if (!row?.posicao) return ` ${ctx.dataset.label}: —`;
+                    const idebStr = row.ideb != null ? String(row.ideb.toFixed(1)).replace('.', ',') : '—';
+                    return ` ${ctx.dataset.label}: ${row.posicao}º de ${row.n_municipios} (IDEB ${idebStr})`;
+                  },
+                },
+              },
+              datalabels: {
+                display: true,
+                clamp: true,
+                clip: false,
+                anchor: 'end',
+                align: 'top',
+                offset: 2,
+                font: { family: 'Inter', size: 10, weight: '700' },
+                color: ctx => ctx.dataset.borderColor,
+                formatter: v => (v != null ? v + 'º' : ''),
+              },
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { font: { family: 'Inter', size: 10 } },
+              },
+              y: {
+                reverse: true,
+                min: 1,
+                max: yMax,
+                beginAtZero: false,
+                title: {
+                  display: true,
+                  text: 'Posição em SC (1º = melhor)',
+                  font: { family: 'Inter', size: 10 },
+                  color: '#666',
+                },
+                grid: { color: 'rgba(0,0,0,.06)' },
+                ticks: {
+                  font: { family: 'Inter', size: 9 },
+                  precision: 0,
+                  callback: v => (Number.isInteger(v) ? v + 'º' : ''),
+                },
               },
             },
           },
-          datalabels: {
-            display: ctx => !ctx.dataset.hidden && ctx.parsed.y != null,
-            anchor: 'end', align: 'top', offset: 3,
-            font: { family: 'Inter', size: 10, weight: '700' },
-            color: ctx => ctx.dataset.borderColor,
-            formatter: v => (v != null ? v + 'º' : ''),
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 } } },
-          y: {
-            reverse: true,
-            min: 1,
-            suggestedMax: Math.min(maxN, 80),
-            title: { display: true, text: 'Posição em SC (1º = melhor)', font: { family: 'Inter', size: 10 }, color: '#666' },
-            grid: { color: 'rgba(0,0,0,.06)' },
-            ticks: { font: { family: 'Inter', size: 9 }, callback: v => v + 'º' },
-          },
-        },
-      },
-    });
-    S.charts.push(rankChart);
+        });
+        S.charts.push(rankChart);
 
-    const applyRankFilter = () => {
-      const etSel = document.getElementById('ideb-rank-etapas')?.value || 'ambas';
-      rankChart.data.datasets.forEach(ds => {
-        ds.hidden = !(etSel === 'ambas' || ds._etapa === etSel);
-      });
-      rankChart.update();
-    };
-    document.getElementById('ideb-rank-etapas')?.addEventListener('change', applyRankFilter);
+        const applyRankFilter = () => {
+          const etSel = document.getElementById('ideb-rank-etapas')?.value || 'ambas';
+          rankChart.data.datasets.forEach(ds => {
+            ds.hidden = !(etSel === 'ambas' || ds._etapa === etSel);
+          });
+          rankChart.update();
+        };
+        document.getElementById('ideb-rank-etapas')?.addEventListener('change', applyRankFilter);
+      }
+    } catch (err) {
+      console.error('[IDEB] ranking temporal', err);
+      elRank.parentElement.insertAdjacentHTML('beforeend',
+        `<p style="padding:12px;color:#c62828;font-size:11px">Erro ao montar o ranking temporal. Recarregue a página (Ctrl+F5).</p>`);
+    }
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -6344,6 +6385,11 @@ function renderIdeb() {
   bindTopbarFilters();
   bindRedeToggle();
   updateActiveFilters();
+  // Garante ano no banner mesmo se algum gráfico falhar acima
+  const selAnoFinal = document.getElementById('sel-ano');
+  if (selAnoFinal && !selAnoFinal.options.length) {
+    selAnoFinal.innerHTML = anos.map(a => `<option value="${a}" ${a === anoSel ? 'selected' : ''}>${a}</option>`).join('');
+  }
 }
 
 
