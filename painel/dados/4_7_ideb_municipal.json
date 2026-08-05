@@ -2,7 +2,7 @@
   "metadata": {
     "fonte": "IDEB/INEP — Divulgação 2023 (planilhas de municípios)",
     "recorte": "Rede Municipal — Joinville/SC",
-    "gerado_em": "2026-08-05T08:50:54.319790",
+    "gerado_em": "2026-08-05T10:11:12.867360",
     "formula": "IDEB = N (Nota SAEB padronizada) × P (Indicador de Rendimento)",
     "nota_metodologica": "Valores municipais oficiais do INEP (VL_OBSERVADO). Não é média dos IDEBs escolares — a média escolar distorce o índice da rede."
   },
@@ -23262,7 +23262,48 @@
         "AF": 4.9
       }
     },
-    "brasil_municipal": {},
+    "brasil_municipal": {
+      "2005": {
+        "AI": 3.6,
+        "AF": 3.2
+      },
+      "2007": {
+        "AI": 4.0,
+        "AF": 3.5
+      },
+      "2009": {
+        "AI": 4.5,
+        "AF": 3.7
+      },
+      "2011": {
+        "AI": 4.8,
+        "AF": 3.8
+      },
+      "2013": {
+        "AI": 5.0,
+        "AF": 3.9
+      },
+      "2015": {
+        "AI": 5.3,
+        "AF": 4.2
+      },
+      "2017": {
+        "AI": 5.6,
+        "AF": 4.4
+      },
+      "2019": {
+        "AI": 5.7,
+        "AF": 4.6
+      },
+      "2021": {
+        "AI": 5.5,
+        "AF": 4.8
+      },
+      "2023": {
+        "AI": 5.7,
+        "AF": 4.7
+      }
+    },
     "sc_publica": {
       "2005": {
         "AI": 4.3,
@@ -23305,7 +23346,48 @@
         "AF": 4.9
       }
     },
-    "brasil_publica": {}
+    "brasil_publica": {
+      "2005": {
+        "AI": 3.6,
+        "AF": 3.2
+      },
+      "2007": {
+        "AI": 4.0,
+        "AF": 3.5
+      },
+      "2009": {
+        "AI": 4.5,
+        "AF": 3.7
+      },
+      "2011": {
+        "AI": 4.8,
+        "AF": 3.8
+      },
+      "2013": {
+        "AI": 5.0,
+        "AF": 3.9
+      },
+      "2015": {
+        "AI": 5.3,
+        "AF": 4.2
+      },
+      "2017": {
+        "AI": 5.6,
+        "AF": 4.4
+      },
+      "2019": {
+        "AI": 5.7,
+        "AF": 4.6
+      },
+      "2021": {
+        "AI": 5.5,
+        "AF": 4.8
+      },
+      "2023": {
+        "AI": 5.7,
+        "AF": 4.7
+      }
+    }
   },
   "media_municipios_sc": {
     "2005": {

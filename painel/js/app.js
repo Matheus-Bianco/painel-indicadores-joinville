@@ -6051,9 +6051,16 @@ function renderIdeb() {
     <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
       <div class="chart-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-          <div class="chart-title" style="margin:0">${JV_MODE ? 'IDEB — Evolução por Etapa' : 'IDEB Observado × Meta SEDUC-RS'} — ${geoLabel}</div>
+          <div class="chart-title" style="margin:0" id="ideb-evo-title">${JV_MODE ? 'IDEB — Evolução por Etapa' : 'IDEB Observado × Meta SEDUC-RS'} — ${geoLabel}</div>
           ${JV_MODE ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
+              Município
+              <select id="ideb-evo-mun" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff;max-width:220px">
+                ${Object.entries(lookup).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
+                  .map(([cod, nome]) => `<option value="${cod}" ${cod === '4209102' ? 'selected' : ''}>${nome}</option>`).join('')}
+              </select>
+            </label>
             <label style="font-size:11px;color:#555;display:flex;align-items:center;gap:5px">
               Etapas
               <select id="ideb-evo-etapas" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #ccc;font-family:Inter;background:#fff">
@@ -6068,13 +6075,12 @@ function renderIdeb() {
                 <option value="nenhuma" selected>Nenhuma referência</option>
                 <option value="sc">SC pública</option>
                 <option value="br">Brasil pública</option>
-                <option value="ambas">SC + Brasil</option>
               </select>
             </label>
           </div>` : ''}
         </div>
         <div style="height:360px"><canvas id="chart-ideb-evolucao"></canvas></div>
-        <div class="chart-source">${FONTE_IDEB}</div>
+        <div class="chart-source">${FONTE_IDEB}${JV_MODE ? ' · Referência Brasil = média das 5 macrorregiões (rede pública INEP)' : ''}</div>
       </div>
     </div>
 
@@ -6220,20 +6226,30 @@ function renderIdeb() {
     const metaYears = showMetas ? ['2025', '2027'].filter(y => !anos.includes(y)) : [];
     const chartLabels = [...anos, ...metaYears];
 
+    const getRefVal = (scopeKeys, a, et) => {
+      for (const k of scopeKeys) {
+        const v = ideb.referencias?.[k]?.[a]?.[et];
+        if (v != null) return v;
+      }
+      return null;
+    };
+
+    const munSerie = (cod, et) => chartLabels.map(a => {
+      if (JV_MODE && cod) return ideb.por_municipio?.[a]?.[cod]?.[et]?.ideb ?? null;
+      return getGeoData(a)?.[et]?.ideb ?? null;
+    });
+
+    const evoMun0 = JV_MODE ? (document.getElementById('ideb-evo-mun')?.value || '4209102') : null;
+
     const datasets = [];
     idebEtapas.forEach((et, etIdx) => {
-      // Observed data (fill observed years, null for future)
-      const dataObs = chartLabels.map(a => {
-        const gd = getGeoData(a);
-        return gd?.[et]?.ideb ?? null;
-      });
       datasets.push({
-        label: idebLabels[etIdx], data: dataObs, _isMeta: false, _etIdx: etIdx, _isSeduc: false, _etapa: et,
+        label: idebLabels[etIdx], data: munSerie(evoMun0, et),
+        _isMeta: false, _etIdx: etIdx, _isSeduc: false, _etapa: et,
         borderColor: idebCores[etIdx], backgroundColor: idebCores[etIdx] + '18',
         borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fff', pointBorderWidth: 2,
         tension: .3, spanGaps: true,
       });
-      // Metas SEDUC (dashed line, at state level) — não exibir em Joinville
       if (showMetas) {
         const dataMeta = chartLabels.map(a => METAS_SEDUC[et]?.[parseInt(a)] ?? null);
         if (dataMeta.some(v => v != null)) {
@@ -6245,16 +6261,15 @@ function renderIdeb() {
           });
         }
       }
-      // Referências SC / Brasil — controladas por menu suspenso (não pela legenda)
       if (JV_MODE && ideb.referencias) {
         const refScopes = [
-          { key: 'sc_municipal', refTag: 'sc', label: 'SC pública', dash: [7, 4] },
-          { key: 'brasil_municipal', refTag: 'br', label: 'Brasil pública', dash: [2, 3] },
+          { keys: ['sc_publica', 'sc_municipal'], refTag: 'sc', label: 'SC pública', dash: [7, 4] },
+          { keys: ['brasil_publica', 'brasil_municipal'], refTag: 'br', label: 'Brasil pública', dash: [2, 3] },
         ];
         refScopes.forEach(sc => {
           datasets.push({
             label: `${idebLabels[etIdx]} — ${sc.label}`,
-            data: chartLabels.map(a => ideb.referencias[sc.key]?.[a]?.[et] ?? null),
+            data: chartLabels.map(a => getRefVal(sc.keys, a, et)),
             _isMeta: true, _etIdx: etIdx, _isSeduc: false, _etapa: et, _refTag: sc.refTag,
             borderColor: idebCores[etIdx], borderDash: sc.dash, borderWidth: 1.6,
             pointRadius: 0, tension: .3, spanGaps: true, hidden: true,
@@ -6293,24 +6308,32 @@ function renderIdeb() {
     });
     S.charts.push(evoChart);
 
-    // Menus suspensos (JV): etapas + referência
+    // Menus suspensos (JV): município + etapas + referência
     if (JV_MODE) {
       const applyEvoFilters = () => {
+        const munCod = document.getElementById('ideb-evo-mun')?.value || '4209102';
+        const munNome = lookup[munCod] || munCod;
         const etSel = document.getElementById('ideb-evo-etapas')?.value || 'ambas';
         const refSel = document.getElementById('ideb-evo-ref')?.value || 'nenhuma';
+        const titleEl = document.getElementById('ideb-evo-title');
+        if (titleEl) titleEl.textContent = `IDEB — Evolução por Etapa — ${munNome}`;
+
         evoChart.data.datasets.forEach(ds => {
+          if (!ds._isMeta) {
+            ds.data = munSerie(munCod, ds._etapa);
+          }
           const etOk = etSel === 'ambas' || ds._etapa === etSel;
           if (!ds._isMeta) {
             ds.hidden = !etOk;
           } else {
-            const refOk = refSel === 'ambas'
-              || (refSel === 'sc' && ds._refTag === 'sc')
+            const refOk = (refSel === 'sc' && ds._refTag === 'sc')
               || (refSel === 'br' && ds._refTag === 'br');
             ds.hidden = !(etOk && refOk && refSel !== 'nenhuma');
           }
         });
         evoChart.update();
       };
+      document.getElementById('ideb-evo-mun')?.addEventListener('change', applyEvoFilters);
       document.getElementById('ideb-evo-etapas')?.addEventListener('change', applyEvoFilters);
       document.getElementById('ideb-evo-ref')?.addEventListener('change', applyEvoFilters);
       applyEvoFilters();

@@ -184,48 +184,49 @@ def load_top10_sc_pop():
 
 
 def load_uf_publica_refs():
-    """Referências oficiais rede Pública (UF SC e Brasil) — planilha regiões/UFs."""
+    """Referências oficiais rede Pública (UF SC e Brasil) — planilha regiões/UFs.
+
+    A planilha INEP de UFs/regiões não traz linha 'Brasil'. O IDEB Brasil pública
+    é aproximado pela média simples das 5 macrorregiões (rede Pública) — próximo
+    do valor oficial publicado pelo Inep.
+    """
     try:
         fpath = find_file("divulgacao_regioes_ufs_ideb_2023.xlsx")
     except FileNotFoundError:
         return {}
     refs = {"sc_publica": {}, "brasil_publica": {}}
-    # Mantém chaves antigas do painel apontando para pública oficial
+    # Chaves antigas do painel (compat) apontam para pública oficial
     refs_compat = {"sc_municipal": {}, "brasil_municipal": {}}
+    REGIOES = ["Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]
 
     for etapa_key, cfg in ETAPAS.items():
         df = pd.read_excel(fpath, sheet_name=cfg["uf_sheet"], header=9)
         df = df.rename(columns={df.columns[0]: "UF", df.columns[1]: "REDE"})
+        df["UF"] = df["UF"].astype(str).str.strip()
+        df["REDE"] = df["REDE"].astype(str).str.strip()
+        is_pub = df["REDE"].str.contains("Pública", case=False, na=False)
+
         for ano in cfg["anos_ideb"]:
             col = f"VL_OBSERVADO_{ano}"
             if col not in df.columns:
                 continue
             # Santa Catarina — Pública
-            sc = df[
-                (df["UF"].astype(str) == "Santa Catarina")
-                & (df["REDE"].astype(str).str.contains("Pública", case=False, na=False))
-            ]
+            sc = df[(df["UF"] == "Santa Catarina") & is_pub]
             if len(sc):
                 v = safe_numeric(sc.iloc[0][col])
                 if v is not None:
                     refs["sc_publica"].setdefault(str(ano), {})[etapa_key] = round(v, 1)
                     refs_compat["sc_municipal"].setdefault(str(ano), {})[etapa_key] = round(v, 1)
-            # Brasil — última ocorrência com Pública no bloco nacional
-            br = df[
-                (df["UF"].astype(str).str.strip().isin(["Brasil", "BRASIL"]))
-                & (df["REDE"].astype(str).str.contains("Pública", case=False, na=False))
-            ]
-            if br.empty:
-                # Em algumas versões Brasil vem sem nome de UF nas primeiras linhas regionais;
-                # usa média nacional via linha 'Total' da região inexistente — fallback:
-                pass
-            else:
-                v = safe_numeric(br.iloc[0][col])
-                if v is not None:
-                    refs["brasil_publica"].setdefault(str(ano), {})[etapa_key] = round(v, 1)
-                    refs_compat["brasil_municipal"].setdefault(str(ano), {})[etapa_key] = round(v, 1)
 
-    # Fallback Brasil: se não achar, calcula mediana dos municípios (rede Municipal) no arquivo mun
+            # Brasil — média das 5 macrorregiões (Pública); planilha não tem linha Brasil
+            br = df[df["UF"].isin(REGIOES) & is_pub]
+            vals = [safe_numeric(x) for x in br[col].tolist()]
+            vals = [v for v in vals if v is not None]
+            if vals:
+                v = round(float(np.mean(vals)), 1)
+                refs["brasil_publica"].setdefault(str(ano), {})[etapa_key] = v
+                refs_compat["brasil_municipal"].setdefault(str(ano), {})[etapa_key] = v
+
     return {**refs_compat, **refs}
 
 
