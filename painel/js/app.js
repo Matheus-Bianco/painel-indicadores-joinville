@@ -4603,7 +4603,7 @@ function buildFunilTurma(ano) {
 // ══════════════════════════════════════════════════════════
 
 const FONTE_SAEB = 'Fonte: Microdados SAEB — INEP';
-const FONTE_IDEB = 'Fonte: IDEB/INEP — Divulgação 2023';
+const FONTE_IDEB = 'Fonte: IDEB/INEP — Divulgação 2025';
 
 function renderSaeb() {
   const saeb = S.saeb;
@@ -5769,7 +5769,106 @@ function buildIdebRankingHTML(ideb, anoSel) {
       <div class="chart-source" style="padding:8px 12px">Fontes: IDEB/INEP ${ano} (rede municipal) · População: IBGE estimativa 1º jul/2025 · Pos. = ranking interno entre as 10 · Clique nos cabeçalhos para ordenar</div>
     </div>
 
+    ${buildIdebGrandesCidadesHTML(ideb, ano)}
+
     ${buildIdebFullRankingTableHTML(rk)}`;
+}
+
+/** Ranking Joinville entre municípios BR com ≥ 500 mil habitantes. */
+function buildIdebGrandesCidadesHTML(ideb, ano) {
+  const gc = ideb?.grandes_cidades;
+  if (!gc?.por_ano) return '';
+  const anosGc = Object.keys(gc.por_ano).sort();
+  const anoKey = anosGc.includes(String(ano)) ? String(ano) : (anosGc[anosGc.length - 1] || '');
+  const bloco = gc.por_ano[anoKey];
+  if (!bloco?.linhas?.length) return '';
+
+  const jv = bloco.joinville || {};
+  const linhas = [...bloco.linhas].sort((a, b) => {
+    const pa = a.posicao_ai ?? 9999;
+    const pb = b.posicao_ai ?? 9999;
+    if (pa !== pb) return pa - pb;
+    return (a.posicao_af ?? 9999) - (b.posicao_af ?? 9999);
+  });
+
+  const th = (col, txt, align = 'left', title = '') =>
+    `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
+      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
+  const td = (html, align = 'left', extra = '') =>
+    `<td style="padding:6px 8px;text-align:${align};border-bottom:1px solid #eee;font-size:11px;${extra}">${html}</td>`;
+
+  const body = linhas.map(r => {
+    const isJv = r.cod === '4209102';
+    const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
+    const nomeNorm = `${r.nome || ''} ${r.uf || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return `<tr style="${bg}" data-rank_pop="${r.rank_pop ?? ''}" data-nome="${nomeNorm}" data-uf="${(r.uf || '').toLowerCase()}"
+      data-populacao="${r.populacao ?? ''}"
+      data-pos_ai="${r.posicao_ai ?? ''}" data-ideb_ai="${r.ideb_ai ?? ''}" data-delta_ai="${isJv ? 0 : (r.delta_ai_vs_joinville ?? '')}"
+      data-pos_af="${r.posicao_af ?? ''}" data-ideb_af="${r.ideb_af ?? ''}" data-delta_af="${isJv ? 0 : (r.delta_af_vs_joinville ?? '')}">
+      ${td(r.rank_pop ?? '—', 'center', 'color:#666')}
+      ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
+      ${td(r.uf || '—', 'center', 'color:#666;font-size:10px')}
+      ${td((r.populacao || 0).toLocaleString('pt-BR'), 'right', 'color:#666;font-size:10px')}
+      ${td(r.posicao_ai ?? '—', 'center', 'font-weight:700;color:#1a365d')}
+      ${td(fmtIdebNum(r.ideb_ai), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
+      ${td(fmtIdebDelta(isJv ? 0 : r.delta_ai_vs_joinville), 'center')}
+      ${td(r.posicao_af ?? '—', 'center', 'font-weight:700;color:#1565C0')}
+      ${td(fmtIdebNum(r.ideb_af), 'center', `font-weight:700;color:${getIdebColor(r.ideb_af)}`)}
+      ${td(fmtIdebDelta(isJv ? 0 : r.delta_af_vs_joinville), 'center')}
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="section-divider" style="margin-top:14px">
+      <span class="section-divider-icon"><img src="img/icons/panorama.png" alt=""></span>
+      <span class="section-divider-text">Grandes cidades — Brasil (≥ 500 mil hab.) · ${anoKey}</span>
+      <span class="section-divider-line"></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="kpi-card accent-green" style="padding:12px 16px">
+        <div class="kpi-label">Posição entre grandes cidades — Anos Iniciais</div>
+        <div class="kpi-value" style="font-size:1.6rem">${jv.posicao_ai ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jv.n_ai ?? '—'}</span></div>
+        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jv.ideb_ai)}</span><span class="kpi-abs">rede municipal</span></div>
+      </div>
+      <div class="kpi-card accent-blue" style="padding:12px 16px">
+        <div class="kpi-label">Posição entre grandes cidades — Anos Finais</div>
+        <div class="kpi-value" style="font-size:1.6rem">${jv.posicao_af ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jv.n_af ?? '—'}</span></div>
+        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jv.ideb_af)}</span><span class="kpi-abs">rede municipal</span></div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="padding:0;overflow:hidden;margin-bottom:10px">
+      <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="chart-title" style="margin:0">${gc.n_cidades || linhas.length} municípios com ≥ 500 mil habitantes</div>
+        <div style="font-size:10.5px;color:#555">
+          Joinville: AI <strong>${jv.posicao_ai ?? '—'}º</strong> · AF <strong>${jv.posicao_af ?? '—'}º</strong>
+          <span style="color:#999"> · só cidades com IDEB municipal publicado no ano</span>
+        </div>
+      </div>
+      <div style="max-height:420px;overflow:auto">
+        <table id="ideb-grandes-table" style="width:100%;border-collapse:collapse;min-width:780px">
+          <thead><tr>
+            ${th('rank_pop', 'Pop.', 'center', 'Ordem nacional por população')}
+            ${th('nome', 'Município')}
+            ${th('uf', 'UF', 'center')}
+            ${th('populacao', 'Hab.', 'right')}
+            ${th('pos_ai', 'Pos. AI', 'center', 'Posição no ranking IDEB AI entre grandes cidades')}
+            ${th('ideb_ai', 'IDEB AI', 'center')}
+            ${th('delta_ai', 'Δ AI', 'center')}
+            ${th('pos_af', 'Pos. AF', 'center', 'Posição no ranking IDEB AF entre grandes cidades')}
+            ${th('ideb_af', 'IDEB AF', 'center')}
+            ${th('delta_af', 'Δ AF', 'center')}
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+      <div class="chart-source" style="padding:8px 12px">
+        Fontes: IDEB/INEP ${anoKey} (VL_OBSERVADO, rede municipal) · População: IBGE estimativa 1º jul/2025 ·
+        ${gc.n_cidades || 48} municípios ≥ 500 mil hab. · Nem todas publicam IDEB municipal em ambas as etapas ·
+        Clique nos cabeçalhos para ordenar
+      </div>
+    </div>`;
 }
 
 /** Duas tabelonas: ranking completo SC por etapa (AI e AF). */
@@ -5967,9 +6066,9 @@ function bindSortableTableHeaders(table, opts = {}) {
   const applySort = () => {
     const rows = [...tbody.querySelectorAll('tr')];
     rows.sort((a, b) => {
-      if (sortCol === 'nome') {
-        const va = a.dataset.nome || '';
-        const vb = b.dataset.nome || '';
+      if (sortCol === 'nome' || sortCol === 'uf') {
+        const va = a.dataset[sortCol] || '';
+        const vb = b.dataset[sortCol] || '';
         return sortAsc ? va.localeCompare(vb, 'pt-BR') : vb.localeCompare(va, 'pt-BR');
       }
       const rawA = a.dataset[sortCol];
@@ -6005,6 +6104,7 @@ function bindIdebContrasteTables() {
   bindSortableTableHeaders(document.getElementById('ideb-sc-ai-table'), { defaultCol: 'pos', defaultAsc: true });
   bindSortableTableHeaders(document.getElementById('ideb-sc-af-table'), { defaultCol: 'pos', defaultAsc: true });
   bindSortableTableHeaders(document.getElementById('ideb-top10-table'), { defaultCol: 'rank_pop', defaultAsc: true });
+  bindSortableTableHeaders(document.getElementById('ideb-grandes-table'), { defaultCol: 'pos_ai', defaultAsc: true });
 }
 
 // Metas IDEB projetadas pela SEDUC-RS (2023–2035) — destrinchadas por etapa
