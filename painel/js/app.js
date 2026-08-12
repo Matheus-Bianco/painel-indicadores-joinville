@@ -10716,7 +10716,7 @@ function afdCompSectionHTML(anoSel) {
         (Adequação da Formação Docente), recorte Joinville · rede municipal · classe comum/exclusiva.
       </div>
     </div>
-    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
+    <div id="afd-comp-grid" class="charts-grid" style="display:grid;grid-template-columns:1.15fr .85fr;gap:10px;align-items:stretch">
       <div class="chart-card">
         <div class="chart-title" id="afd-comp-title">Composição AFD por componente — Anos Iniciais (${anoComp})</div>
         <div style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;flex-wrap:wrap">
@@ -10727,7 +10727,53 @@ function afdCompSectionHTML(anoSel) {
         <div style="height:300px"><canvas id="afd-chart-comp"></canvas></div>
         <div class="chart-source">${FONTE_AFD_COMP}</div>
       </div>
+      <div class="chart-card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+        <div class="table-header">
+          <h3 id="afd-comp-table-title" style="margin:0;font-size:12px">Valores por grupo (%)</h3>
+        </div>
+        <div class="table-wrapper" style="flex:1;margin:0;max-height:340px">
+          <table class="data-table" id="afd-comp-table">
+            <thead>
+              <tr>
+                <th>Componente</th>
+                ${['g1','g2','g3','g4','g5'].map(gk =>
+                  `<th style="text-align:right;color:${AFD_GROUPS[gk].color}">${AFD_GROUPS[gk].short}</th>`
+                ).join('')}
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="chart-source">${FONTE_AFD_COMP}</div>
+      </div>
     </div>`;
+}
+
+function afdFmtPct(v) {
+  if (v == null || Number.isNaN(v)) return '—';
+  return v.toFixed(1).replace('.', ',') + '%';
+}
+
+function afdBuildCompTable(anoSel, etapa) {
+  const tbody = document.querySelector('#afd-comp-table tbody');
+  if (!tbody) return;
+  const anoComp = afdCompAnoDisponivel(anoSel);
+  const rows = afdCompSeries(etapa);
+  const etapaLabel = etapa === 'AF' ? 'Anos Finais' : 'Anos Iniciais';
+  const titleEl = document.getElementById('afd-comp-table-title');
+  if (titleEl) titleEl.textContent = `Valores por grupo (%) — ${etapaLabel} · ${anoComp}`;
+  const gKeys = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  tbody.innerHTML = rows.map(s => {
+    const g = s.por_ano?.[anoComp] || {};
+    return `<tr>
+      <td style="font-weight:600">${s.componente}</td>
+      ${gKeys.map(gk => {
+        const v = g[gk];
+        const bold = gk === 'g1' ? 'font-weight:700' : 'font-weight:500';
+        return `<td style="text-align:right;${bold};color:${AFD_GROUPS[gk].color}">${afdFmtPct(v)}</td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
 }
 
 function afdBuildCompChart(anoSel, etapa) {
@@ -10818,7 +10864,10 @@ function afdBindCompChart(anoSel) {
     document.getElementById('afd-comp-btn-ai')?.classList.toggle('active', sel === 'AI');
     document.getElementById('afd-comp-btn-af')?.classList.toggle('active', sel === 'AF');
   };
-  const rebuild = () => afdBuildCompChart(anoSel, etapa);
+  const rebuild = () => {
+    afdBuildCompChart(anoSel, etapa);
+    afdBuildCompTable(anoSel, etapa);
+  };
   document.getElementById('afd-comp-btn-ai')?.addEventListener('click', () => {
     etapa = 'AI'; setActive(etapa); rebuild();
   });
