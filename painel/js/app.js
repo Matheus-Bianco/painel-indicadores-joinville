@@ -10676,8 +10676,25 @@ function afdCompSeries(etapa) {
   return AFD_COMP_ORDER.map(nome => byName[nome]).filter(Boolean);
 }
 
+function afdCompNotaHTML() {
+  return `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Nota metodológica</div>
+      <div class="info-banner-rede-municipal-body">
+        Os microdados e as planilhas públicas do INEP (<em>AFD_ESCOLAS</em>) publicam o indicador
+        apenas por <strong>etapa de ensino</strong> (cinco grupos), sem cruzar com o componente curricular.
+        Os valores desta seção foram <strong>extraídos diretamente do BI oficial do INEP</strong>
+        (Adequação da Formação Docente), recorte Joinville · rede municipal · classe comum/exclusiva.
+      </div>
+    </div>`;
+}
+
+function afdCompAnos() {
+  return (S.afdComp?.metadata?.anos || []).map(String);
+}
+
 function afdCompAnoDisponivel(anoSel) {
-  const anos = S.afdComp?.metadata?.anos?.map(String) || [];
+  const anos = afdCompAnos();
   if (anoSel && anos.includes(String(anoSel))) return String(anoSel);
   return anos.length ? String(anos[anos.length - 1]) : null;
 }
@@ -10707,15 +10724,7 @@ function afdCompSectionHTML(anoSel) {
       <span class="section-divider-text">Visão por componentes</span>
       <span class="section-divider-line"></span>
     </div>
-    <div class="info-banner-rede-municipal" role="note">
-      <div class="info-banner-rede-municipal-title">Nota metodológica</div>
-      <div class="info-banner-rede-municipal-body">
-        Os microdados e as planilhas públicas do INEP (<em>AFD_ESCOLAS</em>) publicam o indicador
-        apenas por <strong>etapa de ensino</strong> (cinco grupos), sem cruzar com o componente curricular.
-        Os valores desta seção foram <strong>extraídos diretamente do BI oficial do INEP</strong>
-        (Adequação da Formação Docente), recorte Joinville · rede municipal · classe comum/exclusiva.
-      </div>
-    </div>
+    ${afdCompNotaHTML()}
     <div id="afd-comp-grid" class="charts-grid" style="display:grid;grid-template-columns:1.15fr .85fr;gap:10px;align-items:stretch">
       <div class="chart-card">
         <div class="chart-title" id="afd-comp-title">Composição AFD por componente — Anos Iniciais (${anoComp})</div>
@@ -10744,6 +10753,38 @@ function afdCompSectionHTML(anoSel) {
             <tbody></tbody>
           </table>
         </div>
+        <div class="chart-source">${FONTE_AFD_COMP}</div>
+      </div>
+    </div>
+
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_evolucao.png" alt=""></span>
+      <span class="section-divider-text">Evolução Temporal por componente (${afdCompAnos()[0] || 2014}–${afdCompAnos().slice(-1)[0] || 2025})</span>
+      <span class="section-divider-line"></span>
+    </div>
+    ${afdCompNotaHTML()}
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title" id="afd-comp-evol-title">Evolução por componente — Selecione abaixo</div>
+        <div style="display:flex;align-items:center;gap:16px;margin:8px 0 12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:700;color:#555">Componente:</span>
+            <select id="afd-comp-evol-select" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #bbb;font-family:Inter;background:#fff;cursor:pointer;font-weight:600;color:var(--pri)">
+              ${AFD_COMP_ORDER.map(n => `<option value="${n}">${n}</option>`).join('')}
+            </select>
+          </div>
+          <div style="width:1px;height:20px;background:#e0e0e0"></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:700;color:#555">Etapa:</span>
+            <select id="afd-comp-evol-etapa" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid #bbb;font-family:Inter;background:#fff;cursor:pointer;font-weight:600;color:var(--pri)">
+              <option value="AI" selected>Anos Iniciais</option>
+              <option value="AF">Anos Finais</option>
+            </select>
+          </div>
+          <div style="width:1px;height:20px;background:#e0e0e0"></div>
+          <div id="afd-comp-evol-group-pills" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px"></div>
+        </div>
+        <div style="height:280px"><canvas id="afd-chart-comp-evol"></canvas></div>
         <div class="chart-source">${FONTE_AFD_COMP}</div>
       </div>
     </div>`;
@@ -10776,6 +10817,97 @@ function afdBuildCompTable(anoSel, etapa) {
   }).join('');
 }
 
+function afdDestroyCanvasChart(canvas) {
+  if (!canvas) return;
+  const existing = Chart.getChart(canvas);
+  if (!existing) return;
+  const idx = S.charts.indexOf(existing);
+  existing.destroy();
+  if (idx >= 0) S.charts.splice(idx, 1);
+}
+
+function afdCompFind(etapa, componente) {
+  return (S.afdComp?.series || []).find(s =>
+    s.rede === 'municipal' && s.etapa === etapa && s.componente === componente
+  ) || null;
+}
+
+function afdBuildCompEvolChart(etapa, componente, selGroups) {
+  const canvas = document.getElementById('afd-chart-comp-evol');
+  if (!canvas) return;
+  const anos = afdCompAnos();
+  const serie = afdCompFind(etapa, componente);
+  const etapaLabel = etapa === 'AF' ? 'Anos Finais' : 'Anos Iniciais';
+  const groups = (selGroups && selGroups.length) ? selGroups : ['g1'];
+  const titleEl = document.getElementById('afd-comp-evol-title');
+  const titleGroups = groups.map(gk => AFD_GROUPS[gk].short).join(' + ');
+  if (titleEl) {
+    titleEl.textContent = `Evolução ${titleGroups} — ${componente} · ${etapaLabel}`;
+  }
+  afdDestroyCanvasChart(canvas);
+  if (!serie || !anos.length) return;
+
+  const datasets = groups.map(gk => ({
+    label: AFD_GROUPS[gk].label,
+    data: anos.map(a => {
+      const v = serie.por_ano?.[a]?.[gk];
+      return v == null ? null : v;
+    }),
+    borderColor: AFD_GROUPS[gk].color,
+    backgroundColor: AFD_GROUPS[gk].color + '22',
+    tension: 0.3,
+    pointRadius: 4,
+    borderWidth: 2.5,
+    fill: false,
+    spanGaps: false,
+  }));
+  const maxVal = Math.max(0, ...datasets.flatMap(d => d.data.filter(v => v != null)));
+  const yMax = Math.max(maxVal * 1.15, 10);
+
+  S.charts.push(new Chart(canvas, {
+    type: 'line',
+    data: { labels: anos, datasets },
+    options: {
+      ...CHART_DEFAULTS,
+      layout: { padding: { top: 22 } },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: {
+          display: true,
+          labels: { font: { family: 'Inter', size: 10, weight: '600' }, boxWidth: 10, padding: 6 },
+          onClick: null,
+        },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return ` ${ctx.dataset.label}: ${v == null ? '—' : v.toFixed(1) + '%'}`;
+            },
+          },
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] != null,
+          color: '#333',
+          font: { family: 'Inter', size: 8, weight: '700' },
+          anchor: 'end',
+          align: 'top',
+          formatter: v => (v == null ? '' : v.toFixed(1) + '%'),
+        },
+      },
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: {
+          ...CHART_DEFAULTS.scales.y,
+          beginAtZero: true,
+          max: yMax,
+          ticks: { ...CHART_DEFAULTS.scales.y?.ticks, callback: v => v + '%' },
+        },
+      },
+    },
+  }));
+}
+
 function afdBuildCompChart(anoSel, etapa) {
   const canvas = document.getElementById('afd-chart-comp');
   if (!canvas) return;
@@ -10788,12 +10920,7 @@ function afdBuildCompChart(anoSel, etapa) {
 
   const labels = rows.map(s => s.componente);
   const gKeys = ['g1', 'g2', 'g3', 'g4', 'g5'];
-  const existing = Chart.getChart(canvas);
-  if (existing) {
-    const idx = S.charts.indexOf(existing);
-    existing.destroy();
-    if (idx >= 0) S.charts.splice(idx, 1);
-  }
+  afdDestroyCanvasChart(canvas);
 
   S.charts.push(new Chart(canvas, {
     type: 'bar',
@@ -10858,23 +10985,75 @@ function afdBuildCompChart(anoSel, etapa) {
 
 function afdBindCompChart(anoSel) {
   const canvas = document.getElementById('afd-chart-comp');
-  if (!canvas) return;
+  const canvasEvol = document.getElementById('afd-chart-comp-evol');
+  if (!canvas && !canvasEvol) return;
   let etapa = 'AI';
+  let etapaEvol = 'AI';
+  let componente = 'Língua portuguesa';
+  let selGroups = ['g1'];
   const setActive = (sel) => {
     document.getElementById('afd-comp-btn-ai')?.classList.toggle('active', sel === 'AI');
     document.getElementById('afd-comp-btn-af')?.classList.toggle('active', sel === 'AF');
   };
-  const rebuild = () => {
+  const rebuildStacked = () => {
     afdBuildCompChart(anoSel, etapa);
     afdBuildCompTable(anoSel, etapa);
   };
+  const rebuildEvol = () => {
+    afdBuildCompEvolChart(etapaEvol, componente, selGroups);
+  };
+  const sel = document.getElementById('afd-comp-evol-select');
+  if (sel) {
+    sel.value = componente;
+    sel.addEventListener('change', () => {
+      componente = sel.value;
+      rebuildEvol();
+    });
+  }
+  const etapaSel = document.getElementById('afd-comp-evol-etapa');
+  if (etapaSel) {
+    etapaSel.value = etapaEvol;
+    etapaSel.addEventListener('change', () => {
+      etapaEvol = etapaSel.value;
+      rebuildEvol();
+    });
+  }
+  const pillsEl = document.getElementById('afd-comp-evol-group-pills');
+  if (pillsEl) {
+    pillsEl.innerHTML = '<span style="font-size:10px;font-weight:700;color:#555;margin-right:4px">Grupo:</span>' +
+      Object.entries(AFD_GROUPS).map(([k, g]) => {
+        const on = selGroups.includes(k);
+        return `<button class="flx-pill${on ? ' active' : ''}" data-g="${k}"
+          style="font-size:10px;padding:3px 10px;border-radius:12px;border:1.5px solid ${g.color};background:${on ? g.color : 'transparent'};color:${on ? '#fff' : g.color};cursor:pointer;font-weight:600;font-family:Inter;transition:all .15s">${g.short}</button>`;
+      }).join('');
+    pillsEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const g = btn.dataset.g;
+        if (selGroups.includes(g)) {
+          if (selGroups.length === 1) return;
+          selGroups = selGroups.filter(x => x !== g);
+        } else {
+          selGroups = [...selGroups, g];
+        }
+        pillsEl.querySelectorAll('button').forEach(b => {
+          const on = selGroups.includes(b.dataset.g);
+          const col = AFD_GROUPS[b.dataset.g].color;
+          b.classList.toggle('active', on);
+          b.style.background = on ? col : 'transparent';
+          b.style.color = on ? '#fff' : col;
+        });
+        rebuildEvol();
+      });
+    });
+  }
   document.getElementById('afd-comp-btn-ai')?.addEventListener('click', () => {
-    etapa = 'AI'; setActive(etapa); rebuild();
+    etapa = 'AI'; setActive(etapa); rebuildStacked();
   });
   document.getElementById('afd-comp-btn-af')?.addEventListener('click', () => {
-    etapa = 'AF'; setActive(etapa); rebuild();
+    etapa = 'AF'; setActive(etapa); rebuildStacked();
   });
-  rebuild();
+  rebuildStacked();
+  rebuildEvol();
 }
 
 function renderAfd() {
