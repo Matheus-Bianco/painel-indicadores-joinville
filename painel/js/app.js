@@ -42,6 +42,7 @@ const S = {
   inse: null,
   icg: null,       // 4_8_icg.json — Complexidade de Gestão
   afd: null,       // 4_9_afd.json — Adequação da Formação Docente
+  afdComp: null,   // 4_9_afd_componentes.json — AFD por componente (BI INEP)
   ied: null,       // 4_13_ied.json — Indicador de Esforço Docente
   tdi: null,       // 4_10_tdi.json — Distorção Idade-Série
   censoIbge: null, // 4_11_censo_ibge_municipal.json — Demografia/alfabetização IBGE 2022
@@ -5519,6 +5520,14 @@ function fmtIdebDelta(d) {
  * Tabelas de contraste IDEB para o secretário (JV_MODE):
  * ranking SC geral + ranking nas 10 maiores cidades.
  */
+/** Texto de empate: quantos outros municípios compartilham a mesma nota. */
+function fmtIdebEmpate(empatados) {
+  if (empatados == null || empatados <= 0) return null;
+  return empatados === 1
+    ? 'empatado com 1 município'
+    : `empatado com ${empatados} municípios`;
+}
+
 /** Posição de Joinville em SC (rede municipal) por ano e etapa — a partir de por_municipio. */
 function computeIdebPosicaoSerie(ideb, etapa) {
   const anos = Object.keys(ideb?.por_municipio || {}).sort();
@@ -5529,11 +5538,18 @@ function computeIdebPosicaoSerie(ideb, etapa) {
       .map(([cod, m]) => ({ cod, ideb: m[etapa].ideb, nome: ideb.lookup_municipios?.[cod] || cod }))
       .sort((a, b) => (b.ideb - a.ideb) || a.nome.localeCompare(b.nome, 'pt-BR'));
     const idx = rows.findIndex(r => r.cod === '4209102');
+    const idebJv = idx >= 0 ? rows[idx].ideb : null;
+    const nMesmo = idebJv != null
+      ? rows.filter(r => r.ideb === idebJv).length
+      : 0;
     return {
       ano,
       posicao: idx >= 0 ? idx + 1 : null,
       n_municipios: rows.length,
-      ideb: idx >= 0 ? rows[idx].ideb : null,
+      ideb: idebJv,
+      /** Outros municípios com o mesmo IDEB (exclui Joinville). */
+      empatados: nMesmo > 0 ? nMesmo - 1 : 0,
+      n_mesmo_ideb: nMesmo,
     };
   });
 }
@@ -5614,16 +5630,26 @@ function computeIdebRankingsForYear(ideb, ano) {
       AF: af,
       contraste_AI: contraste(ai),
       contraste_AF: contraste(af),
-      joinville_AI: {
-        posicao: jvAI?.posicao ?? null,
-        ideb: jvAI?.ideb ?? null,
-        n_municipios: ai.length,
-      },
-      joinville_AF: {
-        posicao: jvAF?.posicao ?? null,
-        ideb: jvAF?.ideb ?? null,
-        n_municipios: af.length,
-      },
+      joinville_AI: (() => {
+        const nMesmo = jvAI ? ai.filter(r => r.ideb === jvAI.ideb).length : 0;
+        return {
+          posicao: jvAI?.posicao ?? null,
+          ideb: jvAI?.ideb ?? null,
+          n_municipios: ai.length,
+          empatados: nMesmo > 0 ? nMesmo - 1 : 0,
+          n_mesmo_ideb: nMesmo,
+        };
+      })(),
+      joinville_AF: (() => {
+        const nMesmo = jvAF ? af.filter(r => r.ideb === jvAF.ideb).length : 0;
+        return {
+          posicao: jvAF?.posicao ?? null,
+          ideb: jvAF?.ideb ?? null,
+          n_municipios: af.length,
+          empatados: nMesmo > 0 ? nMesmo - 1 : 0,
+          n_mesmo_ideb: nMesmo,
+        };
+      })(),
     },
     top10_cidades: {
       criterio_pop: ideb?.rankings?.top10_cidades?.criterio_pop || 'IBGE Estimativa população residente 1º jul/2025',
@@ -5678,6 +5704,7 @@ function buildIdebRankingHTML(ideb, anoSel) {
           <div style="font-size:10.5px;color:#555;white-space:nowrap">
             Joinville: <strong style="color:#1a365d">${fmtIdebNum(jvInfo.ideb)}</strong>
             · <strong>${jvInfo.posicao ?? '—'}º</strong> de ${jvInfo.n_municipios ?? '—'}
+            ${jvInfo.empatados > 0 ? ` · <span style="color:#e65100">${fmtIdebEmpate(jvInfo.empatados)}</span>` : ''}
           </div>
         </div>
         <div style="max-height:340px;overflow-y:auto">
@@ -5728,12 +5755,18 @@ function buildIdebRankingHTML(ideb, anoSel) {
       <div class="kpi-card accent-green" style="padding:12px 16px">
         <div class="kpi-label">Posição em SC — Anos Iniciais</div>
         <div class="kpi-value" style="font-size:1.6rem">${jvAI.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAI.n_municipios ?? '—'}</span></div>
-        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jvAI.ideb)}</span><span class="kpi-abs">rede municipal</span></div>
+        <div class="kpi-footer">
+          <span>IDEB ${fmtIdebNum(jvAI.ideb)}${jvAI.empatados > 0 ? ` · ${fmtIdebEmpate(jvAI.empatados)}` : ''}</span>
+          <span class="kpi-abs">rede municipal</span>
+        </div>
       </div>
       <div class="kpi-card accent-blue" style="padding:12px 16px">
         <div class="kpi-label">Posição em SC — Anos Finais</div>
         <div class="kpi-value" style="font-size:1.6rem">${jvAF.posicao ?? '—'}º <span style="font-size:.85rem;font-weight:500;color:#666">de ${jvAF.n_municipios ?? '—'}</span></div>
-        <div class="kpi-footer"><span>IDEB ${fmtIdebNum(jvAF.ideb)}</span><span class="kpi-abs">rede municipal</span></div>
+        <div class="kpi-footer">
+          <span>IDEB ${fmtIdebNum(jvAF.ideb)}${jvAF.empatados > 0 ? ` · ${fmtIdebEmpate(jvAF.empatados)}` : ''}</span>
+          <span class="kpi-abs">rede municipal</span>
+        </div>
       </div>
     </div>
 
@@ -6430,9 +6463,10 @@ function renderIdeb() {
       <p style="font-size:10.5px;color:#666;margin:0 0 8px;line-height:1.45">
         Posição entre os municípios de SC com IDEB publicado na rede municipal (1º = melhor).
         O eixo é invertido: quanto mais alta a linha, melhor a colocação.
+        No rótulo, <strong>+N</strong> indica empate com N municípios na mesma nota (ex.: 37º+12).
       </p>
       <div style="height:300px"><canvas id="chart-ideb-ranking-temporal"></canvas></div>
-      <div class="chart-source">${FONTE_IDEB} · Ranking calculado sobre VL_OBSERVADO municipal (SC)</div>
+      <div class="chart-source">${FONTE_IDEB} · Ranking calculado sobre VL_OBSERVADO municipal (SC) · Empates = mesma nota com 1 casa decimal</div>
     </div>` : ''}
 
     ${JV_MODE ? buildIdebRankingHTML(ideb, anoSel) : ''}
@@ -6715,7 +6749,7 @@ function renderIdeb() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { top: 28, right: 8, bottom: 4, left: 4 } },
+            layout: { padding: { top: 36, right: 10, bottom: 4, left: 4 } },
             plugins: {
               legend: {
                 display: true, position: 'bottom',
@@ -6736,7 +6770,8 @@ function renderIdeb() {
                     const row = serie[ctx.dataIndex];
                     if (!row?.posicao) return ` ${ctx.dataset.label}: —`;
                     const idebStr = row.ideb != null ? String(row.ideb.toFixed(1)).replace('.', ',') : '—';
-                    return ` ${ctx.dataset.label}: ${row.posicao}º de ${row.n_municipios} (IDEB ${idebStr})`;
+                    const emp = fmtIdebEmpate(row.empatados);
+                    return ` ${ctx.dataset.label}: ${row.posicao}º de ${row.n_municipios} (IDEB ${idebStr})${emp ? ` · ${emp}` : ''}`;
                   },
                 },
               },
@@ -6747,9 +6782,14 @@ function renderIdeb() {
                 anchor: 'end',
                 align: 'top',
                 offset: 2,
-                font: { family: 'Inter', size: 10, weight: '700' },
+                font: { family: 'Inter', size: 9, weight: '700' },
                 color: ctx => ctx.dataset.borderColor,
-                formatter: v => (v != null ? v + 'º' : ''),
+                formatter: (v, ctx) => {
+                  if (v == null) return '';
+                  const serie = ctx.dataset._etapa === 'AI' ? posAI : posAF;
+                  const emp = serie[ctx.dataIndex]?.empatados || 0;
+                  return emp > 0 ? `${v}º+${emp}` : `${v}º`;
+                },
               },
             },
             scales: {
@@ -10599,6 +10639,13 @@ function renderIed() {
 // ══════════════════════════════════════════════════════════
 
 const FONTE_AFD = 'Fonte: INEP — Indicador de Adequação da Formação Docente';
+const FONTE_AFD_COMP = 'Fonte: INEP — BI Adequação da Formação Docente (transcrição dos gráficos oficiais). As planilhas públicas AFD_ESCOLAS não desagregam por componente curricular.';
+
+const AFD_COMP_ORDER = [
+  'Língua portuguesa', 'Matemática', 'Ciências',
+  'História', 'Geografia', 'Educação Física',
+  'Artes', 'Língua estrangeira', 'Ensino religioso',
+];
 
 const AFD_GROUPS = {
   g1: { label: 'G1 — Licenciatura na área', short: 'G1', color: '#43A047' },
@@ -10617,6 +10664,169 @@ const AFD_ETAPAS = [
   { key: 'eja_fund', label: 'EJA Fundamental', short: 'EJA F' },
   { key: 'eja_medio', label: 'EJA Médio', short: 'EJA M' },
 ];
+
+function afdCompSeries(etapa) {
+  const series = S.afdComp?.series;
+  if (!series) return [];
+  const byName = {};
+  for (const s of series) {
+    if (s.rede !== 'municipal' || s.etapa !== etapa) continue;
+    byName[s.componente] = s;
+  }
+  return AFD_COMP_ORDER.map(nome => byName[nome]).filter(Boolean);
+}
+
+function afdCompAnoDisponivel(anoSel) {
+  const anos = S.afdComp?.metadata?.anos?.map(String) || [];
+  if (anoSel && anos.includes(String(anoSel))) return String(anoSel);
+  return anos.length ? String(anos[anos.length - 1]) : null;
+}
+
+function afdCompSectionHTML(anoSel) {
+  if (!JV_MODE || !S.afdComp?.series?.length) return '';
+  if (S.redeSel && S.redeSel !== 'municipal') {
+    return `
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_docentes.png" alt=""></span>
+      <span class="section-divider-text">Visão por componentes</span>
+      <span class="section-divider-line"></span>
+    </div>
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Disponível na Dependência Municipal</div>
+      <div class="info-banner-rede-municipal-body">
+        A desagregação por componente curricular foi transcrita do BI do INEP para a
+        <strong>rede municipal</strong> de Joinville (Anos Iniciais e Anos Finais).
+        Selecione Municipal no seletor de rede para visualizar.
+      </div>
+    </div>`;
+  }
+  const anoComp = afdCompAnoDisponivel(anoSel);
+  return `
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/sec_docentes.png" alt=""></span>
+      <span class="section-divider-text">Visão por componentes</span>
+      <span class="section-divider-line"></span>
+    </div>
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Nota metodológica</div>
+      <div class="info-banner-rede-municipal-body">
+        Os microdados e as planilhas públicas do INEP (<em>AFD_ESCOLAS</em>) publicam o indicador
+        apenas por <strong>etapa de ensino</strong> (cinco grupos), sem cruzar com o componente curricular.
+        Os valores desta seção foram <strong>extraídos diretamente do BI oficial do INEP</strong>
+        (Adequação da Formação Docente), recorte Joinville · rede municipal · classe comum/exclusiva.
+      </div>
+    </div>
+    <div class="charts-grid" style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div class="chart-card">
+        <div class="chart-title" id="afd-comp-title">Composição AFD por componente — Anos Iniciais (${anoComp})</div>
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#555">Etapa:</span>
+          <button type="button" class="map-layer-btn active" id="afd-comp-btn-ai" data-etapa="AI">Anos Iniciais</button>
+          <button type="button" class="map-layer-btn" id="afd-comp-btn-af" data-etapa="AF">Anos Finais</button>
+        </div>
+        <div style="height:300px"><canvas id="afd-chart-comp"></canvas></div>
+        <div class="chart-source">${FONTE_AFD_COMP}</div>
+      </div>
+    </div>`;
+}
+
+function afdBuildCompChart(anoSel, etapa) {
+  const canvas = document.getElementById('afd-chart-comp');
+  if (!canvas) return;
+  const anoComp = afdCompAnoDisponivel(anoSel);
+  const rows = afdCompSeries(etapa);
+  const titleEl = document.getElementById('afd-comp-title');
+  const etapaLabel = etapa === 'AF' ? 'Anos Finais' : 'Anos Iniciais';
+  if (titleEl) titleEl.textContent = `Composição AFD por componente — ${etapaLabel} (${anoComp})`;
+  if (!rows.length || !anoComp) return;
+
+  const labels = rows.map(s => s.componente);
+  const gKeys = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  const existing = Chart.getChart(canvas);
+  if (existing) {
+    const idx = S.charts.indexOf(existing);
+    existing.destroy();
+    if (idx >= 0) S.charts.splice(idx, 1);
+  }
+
+  S.charts.push(new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: gKeys.map(gk => ({
+        label: AFD_GROUPS[gk].short,
+        data: rows.map(s => {
+          const v = s.por_ano?.[anoComp]?.[gk];
+          return v == null ? 0 : v;
+        }),
+        backgroundColor: AFD_GROUPS[gk].color,
+        borderWidth: 0,
+        barPercentage: 0.78,
+        categoryPercentage: 0.85,
+      })),
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      indexAxis: 'y',
+      layout: { padding: { right: 8 } },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: { font: { family: 'Inter', size: 10, weight: '600' }, boxWidth: 10, padding: 8 },
+        },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.x;
+              return ` ${ctx.dataset.label}: ${v == null ? '—' : v.toFixed(1) + '%'}`;
+            },
+          },
+        },
+        datalabels: {
+          display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) >= 4,
+          color: ctx => (ctx.dataset.label === 'G3' ? '#333' : '#fff'),
+          font: { family: 'Inter', size: 8, weight: '700' },
+          formatter: v => v.toFixed(0) + '%',
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          min: 0,
+          max: 100,
+          grid: { color: COLORS.gridLine },
+          ticks: { font: { family: 'Inter', size: 9 }, callback: v => v + '%' },
+        },
+        y: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { family: 'Inter', size: 10, weight: '600' } },
+        },
+      },
+    },
+  }));
+}
+
+function afdBindCompChart(anoSel) {
+  const canvas = document.getElementById('afd-chart-comp');
+  if (!canvas) return;
+  let etapa = 'AI';
+  const setActive = (sel) => {
+    document.getElementById('afd-comp-btn-ai')?.classList.toggle('active', sel === 'AI');
+    document.getElementById('afd-comp-btn-af')?.classList.toggle('active', sel === 'AF');
+  };
+  const rebuild = () => afdBuildCompChart(anoSel, etapa);
+  document.getElementById('afd-comp-btn-ai')?.addEventListener('click', () => {
+    etapa = 'AI'; setActive(etapa); rebuild();
+  });
+  document.getElementById('afd-comp-btn-af')?.addEventListener('click', () => {
+    etapa = 'AF'; setActive(etapa); rebuild();
+  });
+  rebuild();
+}
 
 function renderAfd() {
   const main = document.getElementById('main-content');
@@ -10768,6 +10978,8 @@ function renderAfd() {
       </div>
     </div>
 
+    ${afdCompSectionHTML(anoSel)}
+
     <!-- ═══ EIXO: Evolução Temporal ═══ -->
     <div class="section-divider">
       <span class="section-divider-icon"><img src="img/icons/sec_evolucao.png" alt=""></span>
@@ -10914,6 +11126,8 @@ function renderAfd() {
       }
     }));
   }
+
+  afdBindCompChart(anoSel);
 
   // ── Geo-aware time series helper ──
   const afdGeoSeries = (anos) => {
@@ -17791,6 +18005,10 @@ async function init() {
       if (respInse.ok) S.inse = await respInse.json();
       if (respIcg.ok) S.icg = await respIcg.json();
       if (respAfd.ok) S.afd = await respAfd.json();
+      try {
+        const respAfdComp = await fetch('dados/4_9_afd_componentes.json' + cb);
+        if (respAfdComp.ok) S.afdComp = await respAfdComp.json();
+      } catch (e) { console.warn('afd_componentes', e); }
       if (respIed.ok) {
         try { S.ied = await respIed.json(); } catch (e) { console.warn('ied', e); }
       }
