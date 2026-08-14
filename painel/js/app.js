@@ -12372,6 +12372,11 @@ const FONTE_SUPERIOR = 'Fonte: INEP — <a href="https://www.gov.br/inep/pt-br/a
 const SUP_MOD_COLORS = { presencial: '#003866', ead: '#FFCB04', total: '#EE302F' };
 const SUP_METRIC_LABELS = { mat: 'Matrículas', ing: 'Ingressantes', conc: 'Concluintes' };
 
+function supCursoLabel(c) {
+  const nome = c.no_curso || 'Sem nome';
+  return c.grau ? `${nome} — ${c.grau}` : nome;
+}
+
 function renderEnsinoSuperior() {
   const main = document.getElementById('main-content');
   destroyCharts();
@@ -12864,7 +12869,7 @@ function renderEnsinoSuperior() {
     cursoChart = new Chart(el, {
       type: 'bar',
       data: {
-        labels: top.map(c => c.no_curso),
+        labels: top.map(c => supCursoLabel(c)),
         datasets: [{
           data: vals,
           backgroundColor: barColor,

@@ -202,7 +202,7 @@ def process_ano(ano):
     }
     por_org = {}
     por_ies = {}
-    por_curso = {}  # key = NO_CURSO normalizado
+    por_curso = {}  # key = (NO_CURSO, grau)
 
     for _, r in cursos.iterrows():
         mod = modality_key(r.get("TP_MODALIDADE_ENSINO"))
@@ -211,15 +211,17 @@ def process_ano(ano):
         co = str(r["CO_IES"])
         m, i, c = si(r.get("QT_MAT")), si(r.get("QT_ING")), si(r.get("QT_CONC"))
 
-        # por curso (agregado por nome)
+        # por curso (agregado por nome + grau academico)
         raw_nome = r.get("NO_CURSO")
         nome = str(raw_nome).strip() if pd.notna(raw_nome) and str(raw_nome).strip() else "Sem nome"
-        if nome not in por_curso:
-            por_curso[nome] = {
+        grau = GRAU_MAP.get(si(r.get("TP_GRAU_ACADEMICO")), "")
+        curso_key = (nome, grau)
+        if curso_key not in por_curso:
+            por_curso[curso_key] = {
                 "no_curso": nome,
                 "area": "",
                 "cine_rotulo": "",
-                "grau": "",
+                "grau": grau,
                 "mat_pres": 0, "mat_ead": 0, "mat_total": 0,
                 "ing_pres": 0, "ing_ead": 0, "ing_total": 0,
                 "conc_pres": 0, "conc_ead": 0, "conc_total": 0,
@@ -227,9 +229,8 @@ def process_ano(ano):
                 "_ies": set(),
                 "_area_c": {},
                 "_cine_c": {},
-                "_grau_c": {},
             }
-        pc = por_curso[nome]
+        pc = por_curso[curso_key]
         pc["n_ofertas"] += 1
         pc["_ies"].add(co)
         if mod == "presencial":
@@ -247,13 +248,10 @@ def process_ano(ano):
         pc["conc_total"] += c
         area = str(r.get("NO_CINE_AREA_GERAL") or "").strip() if pd.notna(r.get("NO_CINE_AREA_GERAL")) else ""
         cine = str(r.get("NO_CINE_ROTULO") or "").strip() if pd.notna(r.get("NO_CINE_ROTULO")) else ""
-        grau = GRAU_MAP.get(si(r.get("TP_GRAU_ACADEMICO")), "")
         if area:
             pc["_area_c"][area] = pc["_area_c"].get(area, 0) + 1
         if cine:
             pc["_cine_c"][cine] = pc["_cine_c"].get(cine, 0) + 1
-        if grau:
-            pc["_grau_c"][grau] = pc["_grau_c"].get(grau, 0) + 1
 
         add_mod(mat, mod, m)
         add_mod(ing, mod, i)
@@ -340,7 +338,7 @@ def process_ano(ano):
             "no_curso": pc["no_curso"],
             "area": _mode_str(pc["_area_c"]),
             "cine_rotulo": _mode_str(pc["_cine_c"]),
-            "grau": _mode_str(pc["_grau_c"]),
+            "grau": pc["grau"],
             "mat_pres": pc["mat_pres"],
             "mat_ead": pc["mat_ead"],
             "mat_total": pc["mat_total"],
@@ -408,7 +406,7 @@ def main():
         s = out["serie"]
         print(
             f"  [{ano}] IES oferta={s['ies_oferta']} sede={s['ies_sede']} "
-            f"cursos_nome={len(out['por_curso'])} "
+            f"cursos={len(out['por_curso'])} "
             f"MAT total={s['mat']['total']:,} pres={s['mat']['presencial']:,} ead={s['mat']['ead']:,}"
         )
 
@@ -425,7 +423,8 @@ def main():
                 "Inclui polos/EAD de IES sediadas fora do municipio. "
                 "Presencial e EAD sempre separados. "
                 "ies_sede = instituicoes com reitoria/sede em Joinville. "
-                "por_curso = agregado por NO_CURSO (nome do curso)."
+                "por_curso = agregado por NO_CURSO + TP_GRAU_ACADEMICO "
+                "(Licenciatura e Bacharelado do mesmo nome ficam em linhas distintas)."
             ),
         },
         "serie_temporal": serie_temporal,
