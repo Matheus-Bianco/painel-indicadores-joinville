@@ -7567,8 +7567,7 @@ function renderHome() {
         <div class="home-banner-inner">
           <img class="home-banner-flag" src="img/logo_joinville.png" alt="Logo Joinville">
           <h1 class="home-banner-title">
-            <span class="home-banner-title-main">Painel de Dados Abertos</span>
-            <span class="home-banner-title-sub">Educação — Joinville/SC</span>
+            <span class="home-banner-title-main">Painel de Dados Abertos da Educação Joinvillense</span>
           </h1>
         </div>
       </header>
@@ -7579,7 +7578,6 @@ function renderHome() {
           <span class="home-divider-text">Indicadores Educacionais — Censo Escolar, Avaliações, Ensino Superior e Demografia</span>
           <span class="home-divider-line"></span>
         </div>
-        <p class="home-section-note">Oferta, docentes, fluxo e avaliações oficiais da educação básica em Joinville (INEP), complementados pelo Censo da Educação Superior (INEP) e pelo Censo Demográfico (IBGE).</p>
         <div class="home-grid home-grid-5">
           ${eduSections.map((s, i) => cardHTML(s, i)).join('')}
         </div>
