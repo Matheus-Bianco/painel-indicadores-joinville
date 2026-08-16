@@ -109,35 +109,58 @@ def _muni_inep_set(df_base):
 
 
 def load_ideb(muni_inep):
+    """IDEB por escola — preferência aos arquivos de divulgação 2025 (série 2013–2025).
+
+    Além do observado, extrai nota SAEB e indicador de rendimento do ano mais
+    recente com dado (`ideb_*_saeb`, `ideb_*_rend`) e o ano de referência
+    (`ideb_*_ano`).
+    """
     ideb_dir = os.path.join(BASES_DADOS, "02. Fluxo e Rendimento (Inep_2010_2024_Rendimento_TDI)", "02. IDEB")
     etapas = {
-        'AI': 'divulgacao_anos_iniciais_escolas_2023.xlsx',
-        'AF': 'divulgacao_anos_finais_escolas_2023.xlsx',
-        'EM': 'divulgacao_ensino_medio_escolas_2023.xlsx',
+        'AI': ['divulgacao_anos_iniciais_escolas_2025.xlsx', 'divulgacao_anos_iniciais_escolas_2023.xlsx'],
+        'AF': ['divulgacao_anos_finais_escolas_2025.xlsx', 'divulgacao_anos_finais_escolas_2023.xlsx'],
+        'EM': ['divulgacao_ensino_medio_escolas_2025.xlsx', 'divulgacao_ensino_medio_escolas_2023.xlsx'],
     }
+    ANOS_HIST = [2013, 2015, 2017, 2019, 2021, 2023, 2025]
     result = {}
-    for etapa, fname in etapas.items():
-        fpath = os.path.join(ideb_dir, fname)
-        if not os.path.exists(fpath):
+    for etapa, fnames in etapas.items():
+        fpath = next(
+            (os.path.join(ideb_dir, f) for f in fnames if os.path.exists(os.path.join(ideb_dir, f))),
+            None,
+        )
+        if not fpath:
             continue
-        print(f"  IDEB {etapa}: {fname}...")
+        print(f"  IDEB {etapa}: {os.path.basename(fpath)}...")
         df = pd.read_excel(fpath, header=9)
         df = df[
             (df['CO_MUNICIPIO'].astype(str).str[:7] == str(CO_MUN_JOINVILLE))
             & (df['REDE'] == 'Municipal')
         ]
+        anos = [y for y in ANOS_HIST if f'VL_OBSERVADO_{y}' in df.columns]
         for _, row in df.iterrows():
-            eid = str(int(row['ID_ESCOLA']))
+            try:
+                eid = str(int(row['ID_ESCOLA']))
+            except (ValueError, TypeError):
+                continue
             if eid not in muni_inep:
                 continue
-            obs = {y: safe_float(row.get(f'VL_OBSERVADO_{y}')) for y in [2017, 2019, 2021, 2023]}
-            if obs[2023] is None:
+            obs = {y: safe_float(row.get(f'VL_OBSERVADO_{y}')) for y in anos}
+            obs = {y: v for y, v in obs.items() if v is not None}
+            if not obs:
                 continue
+            ult = max(obs)
+            key = f'ideb_{etapa.lower()}'
             if eid not in result:
                 result[eid] = {'ideb_hist': {}}
-            result[eid][f'ideb_{etapa.lower()}'] = obs[2023]
-            hist_key = f'ideb_{etapa.lower()}'
-            result[eid]['ideb_hist'][hist_key] = {str(y): v for y, v in obs.items() if v is not None}
+            result[eid][key] = obs[ult]
+            result[eid][f'{key}_ano'] = ult
+            result[eid]['ideb_hist'][key] = {str(y): v for y, v in sorted(obs.items())}
+            saeb = safe_float(row.get(f'VL_NOTA_MEDIA_{ult}'))
+            rend = safe_float(row.get(f'VL_INDICADOR_REND_{ult}'))
+            if saeb is not None:
+                result[eid][f'{key}_saeb'] = saeb
+            if rend is not None:
+                result[eid][f'{key}_rend'] = rend
     print(f"    -> {len(result)} escolas com IDEB")
     return result
 
@@ -385,7 +408,8 @@ def load_fluxo_json(muni_inep):
     with open(fpath, encoding="utf-8") as f:
         data = json.load(f)
     result = {}
-    for rec in data.get("por_escola_2024", []):
+    recs = data.get("por_escola_recente") or data.get("por_escola_2025") or data.get("por_escola_2024") or []
+    for rec in recs:
         eid = str(rec.get("cod_escola", "")).split(".")[0]
         if not eid or eid not in muni_inep:
             continue
@@ -394,7 +418,7 @@ def load_fluxo_json(muni_inep):
             'reprov_fund', 'reprov_fund_ai', 'reprov_fund_af', 'reprov_med',
             'aband_fund', 'aband_fund_ai', 'aband_fund_af', 'aband_med',
         ] if k in rec}
-    print(f"  Fluxo 2024: {len(result)} escolas")
+    print(f"  Fluxo (recente): {len(result)} escolas")
     return result
 
 

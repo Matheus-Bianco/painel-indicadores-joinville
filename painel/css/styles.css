@@ -1880,12 +1880,12 @@ body.sidebar-hidden .main-scroll {
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: 168px;
+  min-height: 128px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 40px;
+  padding: 22px 40px;
   box-sizing: border-box;
   background-color: #1E5A8C;
   background-image: url('../img/transparente_alunos_jv.png?v=2');
@@ -1905,7 +1905,7 @@ body.sidebar-hidden .main-scroll {
 }
 
 .home-banner-flag {
-  height: 72px;
+  height: 60px;
   width: auto;
   max-width: 280px;
   flex-shrink: 0;
@@ -1930,13 +1930,13 @@ body.sidebar-hidden .main-scroll {
 
 .home-banner-title-main {
   display: block;
-  font-size: 30px;
+  font-size: 27px;
   font-weight: 800;
 }
 
 .home-banner-title-sub {
   display: block;
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 700;
 }
 
@@ -1944,8 +1944,8 @@ body.sidebar-hidden .main-scroll {
   position: relative;
   z-index: 1;
   flex: 1;
-  padding: 16px 48px 20px;
-  max-width: 1280px;
+  padding: 14px 48px 16px;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -2002,10 +2002,14 @@ body.sidebar-hidden .main-scroll {
 .home-grid-3 {
   grid-template-columns: repeat(3, 1fr);
 }
+.home-grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
 .home-grid-demo {
   grid-template-columns: repeat(4, 1fr);
 }
-.home-grid-demo .home-card {
+.home-grid-demo .home-card,
+.home-card-extra {
   grid-column: span 1;
   max-width: none;
   border-left: 3px solid #1565C0;
@@ -2181,6 +2185,14 @@ body.sidebar-hidden .main-scroll {
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Home grid 5: responsivo ── */
+@media (max-width: 1400px) {
+  .home-grid-5 { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 1100px) {
+  .home-grid-5 { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* ── Mobile Overrides (Moved to bottom for correct specificity) ── */

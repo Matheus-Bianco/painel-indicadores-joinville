@@ -6147,6 +6147,371 @@ const METAS_SEDUC = {
   EM: { 2023: 3.9, 2024: 4.3, 2025: 4.72, 2026: 4.90, 2027: 4.97, 2028: 5.07, 2029: 5.18, 2030: 5.28, 2031: 5.36, 2032: 5.41, 2033: 5.45, 2034: 5.47, 2035: 5.48 },
 };
 
+// ══════════════════════════════════════════════════════════
+// IDEB POR ESCOLA (JV_MODE, rede municipal)
+// ══════════════════════════════════════════════════════════
+
+const FONTE_IDEB_ESC = 'Fonte: IDEB/INEP — divulgação por escola, rede municipal de Joinville';
+
+function idebEscNomeCurto(nome) {
+  let n = String(nome || '')
+    .replace(/^ESCOLA MUNICIPAL DE ENSINO FUNDAMENTAL\s+/i, '')
+    .replace(/^ESCOLA MUNICIPAL\s+/i, '')
+    .replace(/^EM\s+/i, '')
+    .replace(/^E\.?M\.?E\.?F\.?\s+/i, '');
+  n = n.toLowerCase().replace(/(^|[\s.("-])(\p{L})/gu, (m, p, c) => p + c.toUpperCase());
+  n = n.replace(/\s(De|Da|Do|Das|Dos|E)\s/g, s => s.toLowerCase());
+  return n.trim();
+}
+
+/** Linhas de IDEB por escola para a etapa ('ai' | 'af'), com posição (empates compartilham). */
+function idebEscolasRows(etapa) {
+  const key = `ideb_${etapa}`;
+  const out = [];
+  for (const e of (S.escolasData?.escolas || [])) {
+    const hist = e.ideb_hist?.[key];
+    if (!hist) continue;
+    const anos = Object.keys(hist).sort();
+    if (!anos.length) continue;
+    const ult = anos[anos.length - 1];
+    const atual = hist[ult];
+    const anoPrev = anos.length > 1 ? anos[anos.length - 2] : null;
+    const prev = anoPrev ? hist[anoPrev] : null;
+    const delta = prev != null ? +(atual - prev).toFixed(1) : null;
+    const ult4 = anos.slice(-4).map(a => hist[a]);
+    const media = +(ult4.reduce((s, v) => s + v, 0) / ult4.length).toFixed(2);
+    const anteriores = anos.slice(0, -1).slice(-3).map(a => hist[a]);
+    const mediaAnt = anteriores.length ? anteriores.reduce((s, v) => s + v, 0) / anteriores.length : null;
+    const varHist = mediaAnt != null ? +(atual - mediaAnt).toFixed(2) : null;
+    out.push({
+      inep: e.inep, nome: e.nome, nomeCurto: idebEscNomeCurto(e.nome),
+      atual, anoAtual: ult, anoPrev, prev, delta,
+      media, nEd: anos.length, varHist, hist, anos,
+      saeb: e[`${key}_saeb`] ?? null, rend: e[`${key}_rend`] ?? null,
+    });
+  }
+  if (!out.length) return { rows: [], anoRef: null };
+  const anoRef = out.reduce((m, r) => (r.anoAtual > m ? r.anoAtual : m), '0');
+  out.sort((a, b) => {
+    const aRef = a.anoAtual === anoRef ? 0 : 1;
+    const bRef = b.anoAtual === anoRef ? 0 : 1;
+    if (aRef !== bRef) return aRef - bRef;
+    return b.atual - a.atual || a.nomeCurto.localeCompare(b.nomeCurto, 'pt-BR');
+  });
+  let pos = 0, lastVal = null, ranked = 0;
+  out.forEach(r => {
+    if (r.anoAtual !== anoRef) { r.pos = null; return; }
+    ranked += 1;
+    if (r.atual !== lastVal) { pos = ranked; lastVal = r.atual; }
+    r.pos = pos;
+  });
+  return { rows: out, anoRef };
+}
+
+function idebEscSparkSVG(r, color) {
+  const vals = r.anos.map(a => r.hist[a]);
+  if (vals.length < 2) return '';
+  const mx = Math.max(...vals), mn = Math.min(...vals), rg = (mx - mn) || 1;
+  const pts = vals.map((v, j) => `${(j / (vals.length - 1)) * 56 + 2},${17 - ((v - mn) / rg) * 14}`).join(' ');
+  const lastY = 17 - ((vals[vals.length - 1] - mn) / rg) * 14;
+  return `<svg viewBox="0 0 60 20" width="60" height="20" style="vertical-align:middle">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="58" cy="${lastY}" r="1.8" fill="${color}"/>
+  </svg>`;
+}
+
+function buildIdebEscolasSectionHTML() {
+  if (!JV_MODE) return '';
+  const divider = `
+    <div class="section-divider">
+      <span class="section-divider-icon"><img src="img/icons/escola.png" alt=""></span>
+      <span class="section-divider-text">IDEB por Escola — Rede Municipal</span>
+      <span class="section-divider-line"></span>
+    </div>`;
+  if (S.redeSel && S.redeSel !== 'municipal') {
+    return divider + `
+    <div class="info-banner-rede-municipal" role="note">
+      <div class="info-banner-rede-municipal-title">Disponível na Dependência Municipal</div>
+      <div class="info-banner-rede-municipal-body">
+        A análise de IDEB escola a escola está disponível para a rede municipal.
+        Selecione a dependência Municipal no seletor acima para visualizar.
+      </div>
+    </div>`;
+  }
+  const hasData = (S.escolasData?.escolas || []).some(e => e.ideb_hist);
+  if (!hasData) return '';
+  return divider + `
+    <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;color:#555">Etapa:</span>
+      <button type="button" class="map-layer-btn active" id="ideb-esc-btn-ai">Anos Iniciais</button>
+      <button type="button" class="map-layer-btn" id="ideb-esc-btn-af">Anos Finais</button>
+      <span id="ideb-esc-resumo" style="font-size:11px;color:#666;margin-left:6px"></span>
+    </div>
+
+    <div class="charts-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch">
+      <div class="chart-card" style="padding:0;overflow:hidden" id="ideb-esc-card-top"></div>
+      <div class="chart-card" style="padding:0;overflow:hidden" id="ideb-esc-card-bottom"></div>
+      <div class="chart-card" style="padding:0;overflow:hidden" id="ideb-esc-card-up"></div>
+      <div class="chart-card" style="padding:0;overflow:hidden" id="ideb-esc-card-down"></div>
+    </div>
+
+    <div class="chart-card" style="margin-top:10px">
+      <div class="chart-title" id="ideb-esc-quad-title">Quadrante executivo — nível atual × tendência</div>
+      <p style="font-size:10.5px;color:#666;margin:2px 0 8px;line-height:1.45" id="ideb-esc-quad-desc"></p>
+      <div style="height:360px"><canvas id="chart-ideb-esc-quad"></canvas></div>
+      <div class="chart-source">${FONTE_IDEB_ESC} · Tendência = IDEB atual − média das 3 edições anteriores da escola</div>
+    </div>
+
+    <div class="chart-card" style="margin-top:10px;padding:0;overflow:hidden">
+      <div class="table-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 id="ideb-esc-table-title" style="margin:0;font-size:12px">Ranking completo das escolas</h3>
+        <input type="text" class="table-search" id="ideb-esc-search" placeholder="Buscar escola...">
+      </div>
+      <div style="max-height:480px;overflow-y:auto">
+        <table class="data-table" id="ideb-esc-table" style="width:100%">
+          <thead><tr>
+            <th data-col="pos" class="sortable" style="cursor:pointer;text-align:center">Nº</th>
+            <th data-col="nome" class="sortable" style="cursor:pointer">Escola</th>
+            <th data-col="atual" class="sortable" style="cursor:pointer;text-align:center">IDEB</th>
+            <th data-col="delta" class="sortable" style="cursor:pointer;text-align:center">Δ vs ed. anterior</th>
+            <th data-col="media" class="sortable" style="cursor:pointer;text-align:center">Média últ. 4 ed.</th>
+            <th data-col="saeb" class="sortable" style="cursor:pointer;text-align:center">Nota SAEB (N)</th>
+            <th data-col="rend" class="sortable" style="cursor:pointer;text-align:center">Aprovação (P)</th>
+            <th style="text-align:center">Trajetória</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="chart-source" style="padding:8px 12px">${FONTE_IDEB_ESC} · IDEB = N × P · Empates compartilham a mesma posição · Clique nos cabeçalhos para ordenar</div>
+    </div>`;
+}
+
+function bindIdebEscolas() {
+  const btnAI = document.getElementById('ideb-esc-btn-ai');
+  const btnAF = document.getElementById('ideb-esc-btn-af');
+  if (!btnAI && !btnAF) return;
+
+  let etapa = 'ai';
+  let search = '';
+  let sort = { key: 'atual', dir: -1 };
+
+  const etapaLabel = () => (etapa === 'af' ? 'Anos Finais' : 'Anos Iniciais');
+
+  const insightCard = (titulo, cor, itens, fmtVal) => `
+    <div style="padding:9px 12px;border-bottom:2px solid ${cor};background:${cor}12">
+      <div style="font-size:11px;font-weight:700;color:#1a365d">${titulo}</div>
+    </div>
+    <div style="padding:6px 10px 8px">
+      ${itens.length ? itens.map((r, i) => `
+        <div style="display:flex;align-items:baseline;gap:6px;padding:3.5px 0;border-bottom:1px dashed #eef1f5;font-size:11px">
+          <span style="font-weight:700;color:#8a97a8;min-width:14px">${i + 1}.</span>
+          <span style="flex:1;line-height:1.3">${r.nomeCurto}</span>
+          <strong style="color:${cor};white-space:nowrap">${fmtVal(r)}</strong>
+        </div>`).join('') : '<div style="font-size:11px;color:#999;padding:8px 0">Sem dados suficientes</div>'}
+    </div>`;
+
+  const rebuild = () => {
+    const { rows, anoRef } = idebEscolasRows(etapa);
+    const ranked = rows.filter(r => r.pos != null);
+
+    btnAI?.classList.toggle('active', etapa === 'ai');
+    btnAF?.classList.toggle('active', etapa === 'af');
+
+    const resumoEl = document.getElementById('ideb-esc-resumo');
+    if (resumoEl) resumoEl.textContent = `${ranked.length} escolas com IDEB ${anoRef || ''} · ${etapaLabel()}`;
+
+    // ── Cards de insight ──
+    const comHist = rows.filter(r => r.nEd >= 3);
+    const topHist = [...(comHist.length >= 5 ? comHist : rows)].sort((a, b) => b.media - a.media).slice(0, 5);
+    const bottomHist = [...(comHist.length >= 5 ? comHist : rows)].sort((a, b) => a.media - b.media).slice(0, 5);
+    const comDelta = rows.filter(r => r.delta != null && r.anoAtual === anoRef);
+    const up = [...comDelta].filter(r => r.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 5);
+    const down = [...comDelta].filter(r => r.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 5);
+
+    const cardTop = document.getElementById('ideb-esc-card-top');
+    const cardBottom = document.getElementById('ideb-esc-card-bottom');
+    const cardUp = document.getElementById('ideb-esc-card-up');
+    const cardDown = document.getElementById('ideb-esc-card-down');
+    if (cardTop) cardTop.innerHTML = insightCard('Consistentemente fortes (média últ. 4 ed.)', '#2E7D32', topHist, r => r.media.toFixed(1).replace('.', ','));
+    if (cardBottom) cardBottom.innerHTML = insightCard('Atenção histórica (média últ. 4 ed.)', '#C62828', bottomHist, r => r.media.toFixed(1).replace('.', ','));
+    if (cardUp) cardUp.innerHTML = insightCard(`Maiores evoluções (${anoRef} vs ed. anterior)`, '#1565C0', up, r => `+${r.delta.toFixed(1).replace('.', ',')}`);
+    if (cardDown) cardDown.innerHTML = insightCard(`Maiores quedas (${anoRef} vs ed. anterior)`, '#E65100', down, r => r.delta.toFixed(1).replace('.', ','));
+
+    // ── Quadrante executivo ──
+    buildQuad(ranked, anoRef);
+
+    // ── Tabela ──
+    buildTable(rows, anoRef);
+  };
+
+  const buildQuad = (ranked, anoRef) => {
+    const canvas = document.getElementById('chart-ideb-esc-quad');
+    if (!canvas) return;
+    afdDestroyCanvasChart(canvas);
+    const pts = ranked.filter(r => r.varHist != null);
+    const titleEl = document.getElementById('ideb-esc-quad-title');
+    if (titleEl) titleEl.textContent = `Quadrante executivo — IDEB ${anoRef} × tendência histórica (${etapaLabel()})`;
+
+    const redeVal = S.ideb?.serie_temporal?.[anoRef]?.[etapa.toUpperCase()]?.ideb ?? null;
+    const xRef = redeVal ?? (pts.length ? pts.reduce((s, r) => s + r.atual, 0) / pts.length : 0);
+    const descEl = document.getElementById('ideb-esc-quad-desc');
+    if (descEl) {
+      descEl.innerHTML = `Cada ponto é uma escola. Direita da linha vertical = acima da média da rede (${xRef.toFixed(1).replace('.', ',')}); acima da linha horizontal = em ascensão vs a própria história. ` +
+        `<strong style="color:#2E7D32">Verde</strong>: alto e subindo · <strong style="color:#1565C0">Azul</strong>: alto, em queda · ` +
+        `<strong style="color:#E65100">Laranja</strong>: baixo, em ascensão · <strong style="color:#C62828">Vermelho</strong>: baixo e em queda.`;
+    }
+    if (!pts.length) return;
+
+    const quadColor = (r) => {
+      const alto = r.atual >= xRef;
+      const sobe = r.varHist >= 0;
+      if (alto && sobe) return '#2E7D32';
+      if (alto && !sobe) return '#1565C0';
+      if (!alto && sobe) return '#E65100';
+      return '#C62828';
+    };
+    // Rotular extremos (evita poluição com 70+ pontos)
+    const byDelta = [...pts].sort((a, b) => b.varHist - a.varHist);
+    const byNivel = [...pts].sort((a, b) => b.atual - a.atual);
+    const lblSet = new Set([
+      ...byDelta.slice(0, 3), ...byDelta.slice(-3),
+      ...byNivel.slice(0, 3), ...byNivel.slice(-3),
+    ].map(r => r.inep));
+
+    const data = pts.map(r => ({
+      x: r.atual, y: r.varHist, nome: r.nomeCurto, _lbl: lblSet.has(r.inep),
+    }));
+    const xVals = pts.map(r => r.atual);
+    const yVals = pts.map(r => r.varHist);
+    const xMin = Math.min(...xVals, xRef) - 0.3, xMax = Math.max(...xVals, xRef) + 0.3;
+    const yAbs = Math.max(Math.abs(Math.min(...yVals)), Math.abs(Math.max(...yVals)), 0.3) * 1.25;
+
+    S.charts.push(new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            data,
+            pointBackgroundColor: pts.map(quadColor),
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1,
+            pointRadius: 5.5,
+            pointHoverRadius: 8,
+          },
+          { // linha vertical: média da rede
+            type: 'line', data: [{ x: xRef, y: -yAbs }, { x: xRef, y: yAbs }],
+            borderColor: 'rgba(26,54,93,.45)', borderWidth: 1.5, borderDash: [6, 4],
+            pointRadius: 0, datalabels: { display: false },
+          },
+          { // linha horizontal: tendência zero
+            type: 'line', data: [{ x: xMin, y: 0 }, { x: xMax, y: 0 }],
+            borderColor: 'rgba(0,0,0,.3)', borderWidth: 1.2, borderDash: [3, 3],
+            pointRadius: 0, datalabels: { display: false },
+          },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              label: ctx => {
+                const d = ctx.raw;
+                if (d?.nome == null) return null;
+                return ` ${d.nome}: IDEB ${d.x.toFixed(1).replace('.', ',')} · tendência ${d.y >= 0 ? '+' : ''}${d.y.toFixed(2).replace('.', ',')}`;
+              },
+            },
+          },
+          datalabels: {
+            display: ctx => ctx.datasetIndex === 0 && ctx.dataset.data[ctx.dataIndex]?._lbl,
+            formatter: v => v.nome,
+            color: '#37474F',
+            font: { family: 'Inter', size: 8.5, weight: '600' },
+            align: 'top', offset: 5,
+            clip: false,
+          },
+        },
+        scales: {
+          x: {
+            min: Math.floor(xMin * 10) / 10, max: Math.ceil(xMax * 10) / 10,
+            title: { display: true, text: `IDEB ${anoRef}`, font: { family: 'Inter', size: 10, weight: '600' } },
+            ticks: { font: { family: 'Inter', size: 9.5 } }, grid: { color: 'rgba(0,0,0,.05)' },
+          },
+          y: {
+            min: -yAbs, max: yAbs,
+            title: { display: true, text: 'Tendência (atual − média 3 ed. anteriores)', font: { family: 'Inter', size: 10, weight: '600' } },
+            ticks: { font: { family: 'Inter', size: 9.5 } }, grid: { color: 'rgba(0,0,0,.05)' },
+          },
+        },
+      },
+    }));
+  };
+
+  const buildTable = (rows, anoRef) => {
+    const tbody = document.querySelector('#ideb-esc-table tbody');
+    if (!tbody) return;
+    const titleEl = document.getElementById('ideb-esc-table-title');
+    if (titleEl) titleEl.textContent = `Ranking completo das escolas — ${etapaLabel()} · IDEB ${anoRef}`;
+
+    const q = search.trim().toLowerCase();
+    let list = q ? rows.filter(r => r.nome.toLowerCase().includes(q) || r.nomeCurto.toLowerCase().includes(q)) : [...rows];
+    const { key, dir } = sort;
+    list.sort((a, b) => {
+      if (key === 'nome') return dir * a.nomeCurto.localeCompare(b.nomeCurto, 'pt-BR');
+      if (key === 'pos') {
+        const ap = a.pos ?? 9999, bp = b.pos ?? 9999;
+        return dir * (ap - bp);
+      }
+      const av = a[key], bv = b[key];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return dir * (av - bv);
+    });
+
+    const fmtN = v => (v == null ? '—' : v.toFixed(1).replace('.', ','));
+    tbody.innerHTML = list.map(r => {
+      const naoRef = r.anoAtual !== anoRef;
+      const deltaColor = r.delta == null ? '#999' : r.delta > 0 ? '#2E7D32' : r.delta < 0 ? '#C62828' : '#666';
+      const deltaTxt = r.delta == null ? '—' : `${r.delta > 0 ? '+' : ''}${r.delta.toFixed(1).replace('.', ',')}${r.anoPrev ? ` <span style="color:#9aa5b1;font-weight:400">(${r.anoPrev})</span>` : ''}`;
+      return `<tr${naoRef ? ' style="opacity:.55"' : ''} title="${r.nome}${naoRef ? ` — último IDEB disponível: ${r.anoAtual}` : ''}">
+        <td style="text-align:center;font-weight:700;color:#1a365d">${r.pos != null ? r.pos + 'º' : '—'}</td>
+        <td style="font-weight:600">${r.nomeCurto}${naoRef ? ` <span style="font-size:9px;color:#b26a00;font-weight:700">(${r.anoAtual})</span>` : ''}</td>
+        <td style="text-align:center;font-weight:700;color:${getIdebColor(r.atual)}">${fmtN(r.atual)}</td>
+        <td style="text-align:center;font-weight:600;color:${deltaColor}">${deltaTxt}</td>
+        <td style="text-align:center">${fmtN(r.media)}</td>
+        <td style="text-align:center">${r.saeb != null ? r.saeb.toFixed(2).replace('.', ',') : '—'}</td>
+        <td style="text-align:center">${r.rend != null ? (r.rend * 100).toFixed(1).replace('.', ',') + '%' : '—'}</td>
+        <td style="text-align:center">${idebEscSparkSVG(r, getIdebColor(r.atual))}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8" style="text-align:center;color:#999;padding:16px">Nenhuma escola encontrada</td></tr>';
+  };
+
+  btnAI?.addEventListener('click', () => { etapa = 'ai'; rebuild(); });
+  btnAF?.addEventListener('click', () => { etapa = 'af'; rebuild(); });
+
+  document.getElementById('ideb-esc-search')?.addEventListener('input', e => {
+    search = e.target.value;
+    const { rows, anoRef } = idebEscolasRows(etapa);
+    buildTable(rows, anoRef);
+  });
+
+  document.querySelector('#ideb-esc-table thead')?.addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const col = th.dataset.col;
+    if (sort.key === col) sort.dir *= -1;
+    else sort = { key: col, dir: (col === 'nome' || col === 'pos') ? 1 : -1 };
+    const { rows, anoRef } = idebEscolasRows(etapa);
+    buildTable(rows, anoRef);
+  });
+
+  rebuild();
+}
+
 function renderIdeb() {
   const ideb = S.ideb;
   const main = document.getElementById('main-content');
@@ -6470,6 +6835,8 @@ function renderIdeb() {
     </div>` : ''}
 
     ${JV_MODE ? buildIdebRankingHTML(ideb, anoSel) : ''}
+
+    ${JV_MODE ? buildIdebEscolasSectionHTML() : ''}
 
     ${isStateLevel ? `
     <!-- ═══ EIXO: Decomposição N × P ═══ -->
@@ -7145,6 +7512,7 @@ function renderIdeb() {
   if (JV_MODE) {
     bindIdebContrasteTables();
     bindIdebFullRankingFilters();
+    bindIdebEscolas();
   }
   // Garante ano no banner mesmo se algum gráfico falhar acima
   const selAnoFinal = document.getElementById('sel-ano');
@@ -7165,7 +7533,7 @@ function renderHome() {
   document.body.classList.add('sidebar-hidden');
 
   const cardHTML = (s, i) => `
-    <div class="home-card" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .05}s both">
+    <div class="home-card${s.extra ? ' home-card-extra' : ''}" data-nav="${s.view}" style="animation: fadeSlideUp .5s ease ${.2 + i * .04}s both">
       <div class="home-card-icon"><img src="${s.icon}" alt=""></div>
       <div class="home-card-text">
         <div class="home-card-title">${s.title}</div>
@@ -7174,12 +7542,7 @@ function renderHome() {
       <span class="home-card-arrow">›</span>
     </div>`;
 
-  // Contexto demográfico (IBGE) — separado do Censo Escolar / indicadores educacionais
-  const demoSections = [
-    { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo Demográfico 2022' },
-  ];
-
-  // Indicadores educacionais (Censo Escolar INEP + avaliações)
+  // Indicadores educacionais (Censo Escolar INEP + avaliações) + extras (Ensino Superior, Demografia)
   const eduSections = [
     { view: 'acesso', icon: 'img/icons/nav_acesso.png', title: 'Acesso e Matrículas', desc: 'Evolução, etapas e recortes demográficos' },
     { view: 'redes', icon: 'img/icons/panorama.png', title: 'Visão por Redes', desc: 'Comparativo por dependência: escolas, alunos, docentes e etapas' },
@@ -7194,6 +7557,8 @@ function renderHome() {
     { view: 'saeb', icon: 'img/icons/sec_saeb.png', title: 'SAEB', desc: 'Proficiência em Língua Portuguesa e Matemática' },
     { view: 'ideb', icon: 'img/icons/nav_ideb.png', title: 'IDEB', desc: 'Índice de Desenvolvimento da Educação Básica' },
     { view: 'escolas', icon: 'img/icons/escola.png', title: 'Visão por Escola', desc: 'Mapa georreferenciado com indicadores por escola' },
+    { view: 'ensino-superior', icon: 'img/icons/medio.png', title: 'Ensino Superior', desc: 'IES, matrículas, ingressantes e concluintes — presencial e EAD', extra: true },
+    { view: 'censo-ibge', icon: 'img/icons/panorama.png', title: 'Demografia (Censo IBGE)', desc: 'População por faixa etária e alfabetização — Censo 2022', extra: true },
   ];
 
   main.innerHTML = `
@@ -7211,32 +7576,12 @@ function renderHome() {
 
         <div class="home-divider">
           <span class="home-divider-line"></span>
-          <span class="home-divider-text">Contexto Demográfico — IBGE</span>
+          <span class="home-divider-text">Indicadores Educacionais — Censo Escolar, Avaliações, Ensino Superior e Demografia</span>
           <span class="home-divider-line"></span>
         </div>
-        <p class="home-section-note">Dados populacionais do Censo Demográfico (IBGE), usados como referência para metas do PME.</p>
-        <div class="home-grid home-grid-demo">
-          ${demoSections.map((s, i) => cardHTML(s, i)).join('')}
-        </div>
-
-        <div class="home-divider">
-          <span class="home-divider-line"></span>
-          <span class="home-divider-text">Indicadores Educacionais — Censo Escolar e Avaliações</span>
-          <span class="home-divider-line"></span>
-        </div>
-        <p class="home-section-note">Oferta, docentes, fluxo e avaliações oficiais (INEP) da educação básica em Joinville.</p>
-        <div class="home-grid">
-          ${eduSections.map((s, i) => cardHTML(s, i + 1)).join('')}
-        </div>
-
-        <div class="home-divider">
-          <span class="home-divider-line"></span>
-          <span class="home-divider-text">Ensino Superior — Censo da Educação Superior</span>
-          <span class="home-divider-line"></span>
-        </div>
-        <p class="home-section-note">Oferta de graduação em Joinville (presencial, EAD e total) — INEP, 2017–2024.</p>
-        <div class="home-grid home-grid-demo">
-          ${cardHTML({ view: 'ensino-superior', icon: 'img/icons/medio.png', title: 'Ensino Superior', desc: 'IES, matrículas, ingressantes e concluintes — presencial e EAD' }, eduSections.length + 1)}
+        <p class="home-section-note">Oferta, docentes, fluxo e avaliações oficiais da educação básica em Joinville (INEP), complementados pelo Censo da Educação Superior (INEP) e pelo Censo Demográfico (IBGE).</p>
+        <div class="home-grid home-grid-5">
+          ${eduSections.map((s, i) => cardHTML(s, i)).join('')}
         </div>
 
         <div class="home-divider">
@@ -16401,10 +16746,11 @@ function renderEscolas() {
     `;
 
     // 2. Desempenho IDEB
+    const idebAnoRefBol = e.ideb_ai_ano || e.ideb_af_ano || null;
     cHtml += `
       <div class="chart-card" style="padding:16px;display:flex;flex-direction:column;background:#fff;border-radius:8px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
         <div style="font-size:12px;font-weight:800;color:#0D47A1;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-          <img src="img/icons/nav_ideb.png" style="width:16px;height:16px;filter:opacity(0.8)"> Desempenho IDEB (2023)
+          <img src="img/icons/nav_ideb.png" style="width:16px;height:16px;filter:opacity(0.8)"> Desempenho IDEB${idebAnoRefBol ? ` (${idebAnoRefBol})` : ''}
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:11px;padding-bottom:8px;border-bottom:1px dashed #eee">
            <div><b>Anos Iniciais:</b> <span style="color:${getIdebColor(e.ideb_ai)}">${e.ideb_ai ? e.ideb_ai.toFixed(1) : '-'}</span></div>
@@ -16418,10 +16764,11 @@ function renderEscolas() {
     `;
 
     // 3. Fluxo Escolar (TDI)
+    const tdiAnoRefBol = e.tdi_hist ? Object.keys(e.tdi_hist).sort().slice(-1)[0] : null;
     cHtml += `
       <div class="chart-card" style="padding:16px;display:flex;flex-direction:column;background:#fff;border-radius:8px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
         <div style="font-size:12px;font-weight:800;color:#0D47A1;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-          <img src="img/icons/nav_fluxo.png" style="width:16px;height:16px;filter:opacity(0.8)"> Atraso Escolar TDI (2024)
+          <img src="img/icons/nav_fluxo.png" style="width:16px;height:16px;filter:opacity(0.8)"> Atraso Escolar TDI${tdiAnoRefBol ? ` (${tdiAnoRefBol})` : ''}
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:11px;padding-bottom:8px;border-bottom:1px dashed #eee">
            <div><b>Fundamental:</b> <span style="color:#d32f2f">${e.tdi_fund ? e.tdi_fund.toFixed(1)+'%' : '-'}</span></div>
@@ -16457,6 +16804,20 @@ function renderEscolas() {
     ]);
 
     cHtml += `</div>`; // Close grid
+
+    // SEÇÃO BENCHMARK — Escola × Rede (posição entre as escolas da rede)
+    const benchHtml = boletimBenchmarkHTML(e);
+    if (benchHtml) {
+      cHtml += `
+      <div style="background:#fafbfc;border:1px solid #e0e0e0;border-radius:12px;padding:24px;margin-bottom:24px">
+        <div style="font-size:16px;font-weight:800;color:#0D47A1;display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <img src="img/icons/panorama.png" style="width:24px;height:24px;filter:opacity(0.9)">
+          Posição na Rede Municipal
+        </div>
+        <p style="font-size:11px;color:#666;margin:0 0 16px">Comparação da escola com as demais escolas da rede que possuem o indicador. A barra mostra a posição relativa (direita = melhor).</p>
+        ${benchHtml}
+      </div>`;
+    }
 
     // SEÇÃO FLUXO E RENDIMENTO (Full width inside Boletim)
     cHtml += `
@@ -16524,6 +16885,8 @@ function renderEscolas() {
 
     window.renderBoletimFluxo(e.inep);
     window.renderBoletimMatriculas(e.inep);
+    window.renderBoletimIdeb(e.inep);
+    window.renderBoletimTdi(e.inep);
     // Rendimento por série da escola (dados recentes do INEP por escola)
     const _recSerieEsc = (S.fluxo?.por_escola_recente || S.fluxo?.por_escola_2025 || [])
       .find(x => String(x.cod_escola) === String(e.inep));
@@ -16575,6 +16938,160 @@ function renderEscolas() {
           x: { grid: { display: false } }
         }
       }
+    });
+  };
+
+  // ── Benchmark escola × rede (usado no boletim) ──
+  function boletimBenchmarkHTML(e) {
+    const inds = [
+      { key: 'ideb_ai', label: `IDEB Anos Iniciais${e.ideb_ai_ano ? ` (${e.ideb_ai_ano})` : ''}`, higher: true, fmt: v => v.toFixed(1).replace('.', ',') },
+      { key: 'ideb_af', label: `IDEB Anos Finais${e.ideb_af_ano ? ` (${e.ideb_af_ano})` : ''}`, higher: true, fmt: v => v.toFixed(1).replace('.', ',') },
+      { key: 'aprov_fund', label: 'Aprovação Fundamental', higher: true, fmt: v => v.toFixed(1).replace('.', ',') + '%' },
+      { key: 'tdi_fund', label: 'Distorção Idade-Série (Fund.)', higher: false, fmt: v => v.toFixed(1).replace('.', ',') + '%' },
+      { key: 'inse_media', label: 'Nível Socioeconômico (INSE)', higher: true, fmt: v => v.toFixed(2).replace('.', ',') },
+      { key: 'infra_score', label: 'Infraestrutura (% itens presentes)', higher: true, fmt: v => v.toFixed(0) + '%' },
+    ];
+    const rows = [];
+    for (const ind of inds) {
+      const v = e[ind.key];
+      if (v == null) continue;
+      const all = escolas.map(x => x[ind.key]).filter(x => x != null);
+      if (all.length < 5) continue;
+      const media = all.reduce((s, x) => s + x, 0) / all.length;
+      const sorted = [...all].sort((a, b) => (ind.higher ? b - a : a - b));
+      const pos = sorted.indexOf(v) + 1;
+      const pctMelhor = all.length > 1 ? Math.round(((all.length - pos) / (all.length - 1)) * 100) : 100;
+      const acima = ind.higher ? v >= media : v <= media;
+      const corVal = acima ? '#1B5E20' : '#C62828';
+      const deltaTxt = ind.higher
+        ? `${v >= media ? '+' : ''}${(v - media).toFixed(ind.key.startsWith('ideb') || ind.key === 'inse_media' ? 2 : 1).replace('.', ',')}`
+        : `${v <= media ? '' : '+'}${(v - media).toFixed(1).replace('.', ',')}`;
+      rows.push(`
+        <div style="display:grid;grid-template-columns:220px 90px 1fr 150px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px dashed #e8ecf1">
+          <div style="font-size:11.5px;font-weight:600;color:#37474F">${ind.label}</div>
+          <div style="font-size:15px;font-weight:800;color:${corVal};text-align:right">${ind.fmt(v)}</div>
+          <div style="position:relative;height:10px;background:#e9eef4;border-radius:5px;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pctMelhor}%;background:${acima ? 'linear-gradient(90deg,#66BB6A,#2E7D32)' : 'linear-gradient(90deg,#EF9A9A,#C62828)'};border-radius:5px"></div>
+          </div>
+          <div style="font-size:10.5px;color:#607080;line-height:1.4">
+            <strong style="color:#1a365d">${pos}º</strong> de ${all.length} escolas
+            <br>média da rede ${ind.fmt(media)} (${deltaTxt})
+          </div>
+        </div>`);
+    }
+    return rows.length ? `<div>${rows.join('')}</div>` : '';
+  }
+
+  window.renderBoletimIdeb = function(inep) {
+    const esc = escolas.find(x => x.inep === inep);
+    const ctx = document.getElementById('boletim-chart-ideb');
+    if (!ctx || !esc) return;
+    if (window.boletimIdebChart) { window.boletimIdebChart.destroy(); window.boletimIdebChart = null; }
+
+    const histAI = esc.ideb_hist?.ideb_ai || {};
+    const histAF = esc.ideb_hist?.ideb_af || {};
+    const histEM = esc.ideb_hist?.ideb_em || {};
+    const years = [...new Set([...Object.keys(histAI), ...Object.keys(histAF), ...Object.keys(histEM)])].sort();
+    if (!years.length) {
+      ctx.parentElement.innerHTML = '<div style="font-size:11px;color:#888;text-align:center;padding:24px 0">Sem série histórica de IDEB para esta escola.</div>';
+      return;
+    }
+
+    const mk = (label, hist, color) => ({
+      label,
+      data: years.map(y => hist[y] ?? null),
+      borderColor: color, backgroundColor: color + '22',
+      tension: 0.3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5, spanGaps: true,
+    });
+    const datasets = [];
+    if (Object.keys(histAI).length) datasets.push(mk('Anos Iniciais', histAI, '#2E7D32'));
+    if (Object.keys(histAF).length) datasets.push(mk('Anos Finais', histAF, '#1565C0'));
+    if (Object.keys(histEM).length) datasets.push(mk('Ensino Médio', histEM, '#C62828'));
+
+    // Referência da rede (linha tracejada, sem pontos)
+    const st = S.ideb?.serie_temporal || {};
+    const redeAI = years.map(y => st[y]?.AI?.ideb ?? null);
+    const redeAF = years.map(y => st[y]?.AF?.ideb ?? null);
+    if (Object.keys(histAI).length && redeAI.some(v => v != null)) {
+      datasets.push({ label: 'Rede — AI', data: redeAI, borderColor: '#2E7D3266', borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.3, spanGaps: true, datalabels: { display: false } });
+    }
+    if (Object.keys(histAF).length && redeAF.some(v => v != null)) {
+      datasets.push({ label: 'Rede — AF', data: redeAF, borderColor: '#1565C066', borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.3, spanGaps: true, datalabels: { display: false } });
+    }
+
+    const allVals = datasets.flatMap(d => d.data.filter(v => v != null));
+    window.boletimIdebChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: years, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, padding: 6 } },
+          tooltip: { mode: 'index', intersect: false },
+          datalabels: {
+            display: ctx2 => !ctx2.dataset.borderDash && ctx2.dataset.data[ctx2.dataIndex] != null,
+            color: '#333', font: { family: 'Inter', size: 8.5, weight: '700' },
+            anchor: 'end', align: 'top', offset: 2,
+            formatter: v => (v == null ? '' : v.toFixed(1).replace('.', ',')),
+          },
+        },
+        scales: {
+          y: {
+            suggestedMin: allVals.length ? Math.floor(Math.min(...allVals) * 2) / 2 - 0.5 : 0,
+            suggestedMax: allVals.length ? Math.max(...allVals) + 0.6 : 10,
+            ticks: { font: { size: 9.5 }, color: '#888' }, grid: { color: '#f0f0f0' },
+          },
+          x: { ticks: { font: { size: 9.5, weight: 'bold' }, color: '#555' }, grid: { display: false } },
+        },
+      },
+    });
+  };
+
+  window.renderBoletimTdi = function(inep) {
+    const esc = escolas.find(x => x.inep === inep);
+    const ctx = document.getElementById('boletim-chart-tdi');
+    if (!ctx || !esc) return;
+    if (window.boletimTdiChart) { window.boletimTdiChart.destroy(); window.boletimTdiChart = null; }
+
+    const hist = esc.tdi_hist || {};
+    const years = Object.keys(hist).sort();
+    if (!years.length) {
+      ctx.parentElement.innerHTML = '<div style="font-size:11px;color:#888;text-align:center;padding:24px 0">Sem série histórica de TDI para esta escola.</div>';
+      return;
+    }
+    const series = [
+      { key: 'tdi_ai', label: 'Anos Iniciais', color: '#2E7D32' },
+      { key: 'tdi_af', label: 'Anos Finais', color: '#1565C0' },
+      { key: 'tdi_med', label: 'Ensino Médio', color: '#C62828' },
+    ].filter(s => years.some(y => hist[y]?.[s.key] != null));
+    const datasets = series.map(s => ({
+      label: s.label,
+      data: years.map(y => hist[y]?.[s.key] ?? null),
+      backgroundColor: s.color, borderRadius: 3, maxBarThickness: 26,
+    }));
+    const maxV = Math.max(...datasets.flatMap(d => d.data.filter(v => v != null)), 1);
+
+    window.boletimTdiChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: years, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { family: 'Inter', size: 9 }, padding: 6 } },
+          datalabels: {
+            display: ctx2 => ctx2.dataset.data[ctx2.dataIndex] != null,
+            color: '#333', font: { family: 'Inter', size: 8.5, weight: '700' },
+            anchor: 'end', align: 'top', offset: 0,
+            formatter: v => (v == null ? '' : v.toFixed(1).replace('.', ',') + '%'),
+          },
+        },
+        scales: {
+          y: { beginAtZero: true, suggestedMax: maxV * 1.25, ticks: { font: { size: 9.5 }, color: '#888', callback: v => v + '%' }, grid: { color: '#f0f0f0' } },
+          x: { ticks: { font: { size: 9.5, weight: 'bold' }, color: '#555' }, grid: { display: false } },
+        },
+      },
     });
   };
 
