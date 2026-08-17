@@ -1888,10 +1888,6 @@ body.sidebar-hidden .main-scroll {
   padding: 22px 40px;
   box-sizing: border-box;
   background-color: var(--pri);
-  background-image: url('../img/transparente_alunos_jv.png?v=2');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
 }
 
 .home-banner-inner {
