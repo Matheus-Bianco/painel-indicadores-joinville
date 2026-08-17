@@ -1,16 +1,16 @@
 /* ══════════════════════════════════════════════════════════
    Painel de Indicadores Abertos — Educação Joinville/SC
    Design System v2.1 — Identidade Visual Joinville
-   Paleta institucional: Azul #003866 (R0 G56 B102) + Branco #FFFFFF
+   Paleta institucional: Azul #1E5A8C (header) + Branco #FFFFFF
    ══════════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 /* ── Tokens ── */
 :root {
-  --pri: #003866;
-  --pri-light: #1E5A8C;
-  --pri-dark: #00284A;
+  --pri: #1E5A8C;
+  --pri-light: #3A7AB0;
+  --pri-dark: #163E62;
   --sec: #2E6FA0;
   --accent: #5B9BD5;
   --accent-light: #8FC0E8;
@@ -37,7 +37,7 @@
   --topbar-h: 48px;
   --content-h: calc(100vh - 16px);
   --content-max: 1400px;
-  --icon-blue-filter: brightness(0) saturate(100%) invert(14%) sepia(55%) saturate(2469%) hue-rotate(190deg) brightness(95%) contrast(101%);
+  --icon-blue-filter: invert(29%) sepia(51%) saturate(617%) hue-rotate(173deg) brightness(91%) contrast(91%);
 }
 
 /* ── Reset ── */
@@ -60,7 +60,7 @@ body {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
   height: 100vh;
-  background: linear-gradient(180deg, #001E38 0%, #00304F 25%, #003866 60%, #0A5288 100%);
+  background: linear-gradient(180deg, #163E62 0%, #1A4F7A 30%, #1E5A8C 65%, #2E6FA0 100%);
   color: rgba(255,255,255,.9);
   display: flex;
   flex-direction: column;
@@ -284,7 +284,7 @@ body.sidebar-hidden .sidebar {
 }
 
 .filter-select option {
-  background: #003866;
+  background: var(--pri);
   color: #fff;
 }
 
@@ -588,7 +588,7 @@ body.sidebar-hidden .main-scroll {
   50% { box-shadow: 0 0 0 4px rgba(255,203,4,.28); }
 }
 .banner-filter-select option {
-  background: #003866;
+  background: var(--pri);
   color: #fff;
 }
 
@@ -597,7 +597,7 @@ body.sidebar-hidden .main-scroll {
   font-family: 'Inter', sans-serif;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--pri, #003866);
+  color: var(--pri);
   background: #fff;
   border: 1.5px solid rgba(0,56,102,.22);
   border-radius: 7px;
@@ -618,7 +618,7 @@ body.sidebar-hidden .main-scroll {
   height: 15px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--pri, #003866);
+  color: var(--pri);
   background: rgba(0,56,102,.1);
   border-radius: 50%;
   cursor: help;
@@ -647,7 +647,7 @@ body.sidebar-hidden .main-scroll {
   min-width: 220px;
   max-height: 350px;
   overflow-y: auto;
-  background: #003866;
+  background: var(--pri);
   border: 1px solid rgba(255,255,255,.2);
   border-radius: 0 0 6px 6px;
   z-index: 1000;
@@ -856,7 +856,7 @@ body.sidebar-hidden .main-scroll {
 
 .kpi-card.accent-yellow { border-left-color: #FFCB04; background: linear-gradient(135deg, #fff 0%, #fffdf0 100%); }
 .kpi-card.accent-yellow::after { background: radial-gradient(circle at 100% 0%, rgba(255,203,4,.08) 0%, transparent 70%); }
-.kpi-card.accent-green  { border-left-color: #003866; }
+.kpi-card.accent-green  { border-left-color: var(--pri); }
 .kpi-card.accent-red    { border-left-color: #EE302F; background: linear-gradient(135deg, #fff 0%, #fef8f8 100%); }
 .kpi-card.accent-red::after { background: radial-gradient(circle at 100% 0%, rgba(238,48,47,.06) 0%, transparent 70%); }
 .kpi-card.accent-blue   { border-left-color: #1E5A8C; background: linear-gradient(135deg, #fff 0%, #f6f9fe 100%); }
@@ -1007,7 +1007,7 @@ body.sidebar-hidden .main-scroll {
   overflow: visible;
   margin-bottom: 6px;
   padding: 16px 22px;
-  background: linear-gradient(135deg, #001A30 0%, #003866 35%, #0A5288 65%, #2E6FA0 100%);
+  background: linear-gradient(135deg, #163E62 0%, #1E5A8C 40%, #2E6FA0 100%);
   animation: fadeUp .4s ease forwards;
   opacity: 0;
   z-index: 10;
@@ -1142,14 +1142,14 @@ body.sidebar-hidden .main-scroll {
   background: linear-gradient(135deg, #64B5F6 0%, #42A5F5 100%);
 }
 .filter-chip-rede {
-  background: linear-gradient(135deg, #2E6FA0 0%, #003866 100%);
+  background: linear-gradient(135deg, #2E6FA0 0%, #1E5A8C 100%);
   color: #fff;
-  box-shadow: 0 1px 4px rgba(0,56,102,.35);
+  box-shadow: 0 1px 4px rgba(30,90,140,.35);
   cursor: default;
   font-size: 10px;
 }
 .filter-chip-rede:hover {
-  background: linear-gradient(135deg, #2E6FA0 0%, #003866 100%);
+  background: linear-gradient(135deg, #2E6FA0 0%, #1E5A8C 100%);
   transform: none;
 }
 
@@ -1157,7 +1157,7 @@ body.sidebar-hidden .main-scroll {
 .rede-toggle-strip {
   display: flex;
   gap: 0;
-  background: linear-gradient(90deg, #001E38 0%, #003866 100%);
+  background: linear-gradient(90deg, #163E62 0%, #1E5A8C 100%);
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   overflow: hidden;
   padding: 0;
@@ -1448,7 +1448,7 @@ body.sidebar-hidden .main-scroll {
 .chart-card:hover .export-btn { opacity: 1; }
 .export-btn:hover {
   background: linear-gradient(135deg, #dce8f5, #c4d7ed);
-  color: #003866;
+  color: var(--pri);
   transform: scale(1.08);
   box-shadow: 0 2px 8px rgba(91,155,213,.3);
   border-color: #2E6FA0;
@@ -1765,7 +1765,7 @@ body.sidebar-hidden .main-scroll {
   transform: translateX(-50%);
   width: 280px;
   padding: 10px 12px;
-  background: #003866;
+  background: var(--pri);
   color: rgba(255,255,255,.92);
   font-size: 10px;
   font-weight: 400;
@@ -1887,7 +1887,7 @@ body.sidebar-hidden .main-scroll {
   justify-content: center;
   padding: 22px 40px;
   box-sizing: border-box;
-  background-color: #1E5A8C;
+  background-color: var(--pri);
   background-image: url('../img/transparente_alunos_jv.png?v=2');
   background-size: cover;
   background-position: center top;
@@ -2172,8 +2172,8 @@ body.sidebar-hidden .main-scroll {
 
 .home-footer-logos img {
   height: 44px;
-  /* logo branca: inverte para azul escuro no fundo claro */
-  filter: brightness(0) saturate(100%) invert(14%) sepia(55%) saturate(2469%) hue-rotate(190deg) brightness(95%) contrast(101%);
+  /* logo branca: inverte para o azul institucional do header */
+  filter: var(--icon-blue-filter);
   transition: transform .2s;
 }
 

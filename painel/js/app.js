@@ -86,14 +86,14 @@ const FONTE_CENSO = 'Fonte: INEP — <a href="' + URL_CENSO + '" target="_blank"
 
 // Paleta Bandeira RS: Verde #00AB4E, Vermelho #EE302F, Amarelo #FFCB04
 const COLORS = {
-  pri: '#003866', priDark: '#00284A', priLight: '#4A86BC', sec: '#2E6FA0',
+  pri: '#1E5A8C', priDark: '#163E62', priLight: '#4A86BC', sec: '#2E6FA0',
   red: '#EE302F', redLight: '#F4706F',
   yellow: '#FFCB04', yellowLight: '#FFE066',
   accent: '#FFCB04', accentLight: '#FFE066',
-  federal: '#1565C0', estadual: '#2E6FA0', municipal: '#003866', privada: '#6A1B9A', particular: '#6A1B9A', filantropica: '#7B1FA2',
+  federal: '#1565C0', estadual: '#2E6FA0', municipal: '#1E5A8C', privada: '#6A1B9A', particular: '#6A1B9A', filantropica: '#7B1FA2',
   masc: '#1976D2', fem: '#EE302F',
   branca: '#78909C', preta: '#37474F', parda: '#8D6E63', amarela: '#FFCB04', indigena: '#2E6FA0', nd: '#B0BEC5',
-  infantil: '#FFCB04', fundAI: '#0097A7', fundAF: '#F57C00', fundamental: '#003866', medio: '#EE302F', eja: '#1565C0', especial: '#6A1B9A', blue: '#1565C0',
+  infantil: '#FFCB04', fundAI: '#0097A7', fundAF: '#F57C00', fundamental: '#1E5A8C', medio: '#EE302F', eja: '#1565C0', especial: '#6A1B9A', blue: '#1565C0',
   gridLine: 'rgba(0,0,0,.06)',
 };
 
@@ -5675,7 +5675,7 @@ function buildIdebRankingHTML(ideb, anoSel) {
 
   const th = (col, txt, align = 'left', title = '') =>
     `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
-      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
+      style="padding:7px 8px;text-align:${align};background:#1E5A8C;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
   const td = (html, align = 'left', extra = '') =>
     `<td style="padding:6px 8px;text-align:${align};border-bottom:1px solid #eee;font-size:11px;${extra}">${html}</td>`;
 
@@ -5691,7 +5691,7 @@ function buildIdebRankingHTML(ideb, anoSel) {
       const nomeNorm = (r.nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       return `<tr style="${bg}" data-pos="${r.posicao ?? ''}" data-nome="${nomeNorm}"
         data-ideb="${r.ideb ?? ''}" data-delta="${isJv ? 0 : (delta ?? '')}">
-        ${td(r.posicao, 'center', 'font-weight:700;color:#1a365d')}
+        ${td(r.posicao, 'center', 'font-weight:700;color:#1E5A8C')}
         ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
         ${td(fmtIdebNum(r.ideb), 'center', `font-weight:700;color:${getIdebColor(r.ideb)}`)}
         ${td(fmtIdebDelta(isJv ? 0 : delta), 'center')}
@@ -5702,7 +5702,7 @@ function buildIdebRankingHTML(ideb, anoSel) {
         <div style="padding:10px 14px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div class="chart-title" style="margin:0">Ranking SC — ${et === 'AI' ? 'Anos Iniciais' : 'Anos Finais'} (${ano})</div>
           <div style="font-size:10.5px;color:#555;white-space:nowrap">
-            Joinville: <strong style="color:#1a365d">${fmtIdebNum(jvInfo.ideb)}</strong>
+            Joinville: <strong style="color:#1E5A8C">${fmtIdebNum(jvInfo.ideb)}</strong>
             · <strong>${jvInfo.posicao ?? '—'}º</strong> de ${jvInfo.n_municipios ?? '—'}
             ${jvInfo.empatados > 0 ? ` · <span style="color:#e65100">${fmtIdebEmpate(jvInfo.empatados)}</span>` : ''}
           </div>
@@ -5735,7 +5735,7 @@ function buildIdebRankingHTML(ideb, anoSel) {
       ${td(r.rank_pop, 'center', 'color:#666')}
       ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
       ${td(pop, 'right', 'color:#666;font-size:10px')}
-      ${td(r.posicao_top10_ai ?? '—', 'center', 'font-weight:700;color:#1a365d')}
+      ${td(r.posicao_top10_ai ?? '—', 'center', 'font-weight:700;color:#1E5A8C')}
       ${td(fmtIdebNum(r.ideb_ai), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
       ${td(fmtIdebDelta(isJv ? 0 : r.delta_ai_vs_joinville), 'center')}
       ${td(r.posicao_top10_af ?? '—', 'center', 'font-weight:700;color:#1565C0')}
@@ -5826,7 +5826,7 @@ function buildIdebGrandesCidadesHTML(ideb, ano) {
 
   const th = (col, txt, align = 'left', title = '') =>
     `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
-      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
+      style="padding:7px 8px;text-align:${align};background:#1E5A8C;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
   const td = (html, align = 'left', extra = '') =>
     `<td style="padding:6px 8px;text-align:${align};border-bottom:1px solid #eee;font-size:11px;${extra}">${html}</td>`;
 
@@ -5842,7 +5842,7 @@ function buildIdebGrandesCidadesHTML(ideb, ano) {
       ${td(isJv ? `<strong>${r.nome}</strong>` : r.nome)}
       ${td(r.uf || '—', 'center', 'color:#666;font-size:10px')}
       ${td((r.populacao || 0).toLocaleString('pt-BR'), 'right', 'color:#666;font-size:10px')}
-      ${td(r.posicao_ai ?? '—', 'center', 'font-weight:700;color:#1a365d')}
+      ${td(r.posicao_ai ?? '—', 'center', 'font-weight:700;color:#1E5A8C')}
       ${td(fmtIdebNum(r.ideb_ai), 'center', `font-weight:700;color:${getIdebColor(r.ideb_ai)}`)}
       ${td(fmtIdebDelta(isJv ? 0 : r.delta_ai_vs_joinville), 'center')}
       ${td(r.posicao_af ?? '—', 'center', 'font-weight:700;color:#1565C0')}
@@ -5914,7 +5914,7 @@ function buildIdebFullRankingTableHTML(rk) {
 
   const th = (col, txt, align = 'left', title = '') =>
     `<th data-col="${col}" class="sortable" title="${title || 'Clique para ordenar'}"
-      style="padding:7px 8px;text-align:${align};background:#1a365d;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
+      style="padding:7px 8px;text-align:${align};background:#1E5A8C;color:#fff;font-size:10.5px;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none">${txt} <span class="sort-ind" style="opacity:.55">↕</span></th>`;
 
   const buildEtapaTable = (et, label) => {
     const rows = (rk.sc_geral?.[et] || []).map(r => ({
@@ -5924,7 +5924,7 @@ function buildIdebFullRankingTableHTML(rk) {
     }));
     if (!rows.length) return '';
     const slug = et.toLowerCase();
-    const posColor = et === 'AI' ? '#1a365d' : '#1565C0';
+    const posColor = et === 'AI' ? '#1E5A8C' : '#1565C0';
     const body = rows.map(r => {
       const isJv = r.cod === '4209102';
       const bg = isJv ? 'background:rgba(26,54,93,.08);font-weight:700;' : '';
@@ -6299,7 +6299,7 @@ function bindIdebEscolas() {
 
   const insightCard = (titulo, cor, itens, fmtVal) => `
     <div style="padding:9px 12px;border-bottom:2px solid ${cor};background:${cor}12">
-      <div style="font-size:11px;font-weight:700;color:#1a365d">${titulo}</div>
+      <div style="font-size:11px;font-weight:700;color:#1E5A8C">${titulo}</div>
     </div>
     <div style="padding:6px 10px 8px">
       ${itens.length ? itens.map((r, i) => `
@@ -6478,7 +6478,7 @@ function bindIdebEscolas() {
       const deltaColor = r.delta == null ? '#999' : r.delta > 0 ? '#2E7D32' : r.delta < 0 ? '#C62828' : '#666';
       const deltaTxt = r.delta == null ? '—' : `${r.delta > 0 ? '+' : ''}${r.delta.toFixed(1).replace('.', ',')}${r.anoPrev ? ` <span style="color:#9aa5b1;font-weight:400">(${r.anoPrev})</span>` : ''}`;
       return `<tr${naoRef ? ' style="opacity:.55"' : ''} title="${r.nome}${naoRef ? ` — último IDEB disponível: ${r.anoAtual}` : ''}">
-        <td style="text-align:center;font-weight:700;color:#1a365d">${r.pos != null ? r.pos + 'º' : '—'}</td>
+        <td style="text-align:center;font-weight:700;color:#1E5A8C">${r.pos != null ? r.pos + 'º' : '—'}</td>
         <td style="font-weight:600">${r.nomeCurto}${naoRef ? ` <span style="font-size:9px;color:#b26a00;font-weight:700">(${r.anoAtual})</span>` : ''}</td>
         <td style="text-align:center;font-weight:700;color:${getIdebColor(r.atual)}">${fmtN(r.atual)}</td>
         <td style="text-align:center;font-weight:600;color:${deltaColor}">${deltaTxt}</td>
@@ -16972,7 +16972,7 @@ function renderEscolas() {
             <div style="position:absolute;left:0;top:0;height:100%;width:${pctMelhor}%;background:${acima ? 'linear-gradient(90deg,#66BB6A,#2E7D32)' : 'linear-gradient(90deg,#EF9A9A,#C62828)'};border-radius:5px"></div>
           </div>
           <div style="font-size:10.5px;color:#607080;line-height:1.4">
-            <strong style="color:#1a365d">${pos}º</strong> de ${all.length} escolas
+            <strong style="color:#1E5A8C">${pos}º</strong> de ${all.length} escolas
             <br>média da rede ${ind.fmt(media)} (${deltaTxt})
           </div>
         </div>`);
