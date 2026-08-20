@@ -1809,6 +1809,7 @@ function buildCharts(d, anos, anoSel) {
         data: {
           labels: intAnos,
           datasets: [
+            { label: 'Infantil', data: intAnos.map(a => getIntSrc(a).infantil), backgroundColor: COLORS.infantil + 'CC', borderRadius: 4 },
             { label: 'Fundamental', data: intAnos.map(a => getIntSrc(a).fund_total), backgroundColor: COLORS.fundamental + 'CC', borderRadius: 4 },
             ...(JV_MODE ? [] : [{ label: 'Médio', data: intAnos.map(a => getIntSrc(a).medio), backgroundColor: COLORS.medio + 'CC', borderRadius: 4 }]),
           ]
@@ -2324,6 +2325,7 @@ function buildMunChartsFallback(d, anoSel) {
       S.charts.push(new Chart(intEl, {
         type: 'bar',
         data: { labels: intAnos, datasets: [
+          { label: 'Infantil', data: intAnos.map(a => getIntSrc(a).infantil), backgroundColor: COLORS.infantil + 'CC', borderRadius: 4 },
           { label: 'Fundamental', data: intAnos.map(a => getIntSrc(a).fund_total), backgroundColor: COLORS.fundamental + 'CC', borderRadius: 4 },
           ...(JV_MODE ? [] : [{ label: 'Médio', data: intAnos.map(a => getIntSrc(a).medio), backgroundColor: COLORS.medio + 'CC', borderRadius: 4 }]),
         ] },
@@ -14358,15 +14360,15 @@ function buildIntegralDelta(d) {
   const getIntTotal = (ano) => {
     if (S.munSel) {
       const m = d.por_municipio[ano]?.[S.munSel] || {};
-      return (m.int_fund_total || 0) + (m.int_medio || 0);
+      return (m.int_infantil || 0) + (m.int_fund_total || 0) + (m.int_medio || 0);
     }
     if (S.creSel) {
       const agg = aggregateCre(d, ano, S.creSel);
-      return (agg.int_fund_total || 0) + (agg.int_medio || 0);
+      return (agg.int_infantil || 0) + (agg.int_fund_total || 0) + (agg.int_medio || 0);
     }
     const i = d.integral?.[ano];
     if (!i) return null;
-    return (i.fund_total || 0) + (i.medio || 0);
+    return (i.infantil || 0) + (i.fund_total || 0) + (i.medio || 0);
   };
 
   const total24 = getIntTotal('2024');
@@ -14393,13 +14395,16 @@ function buildIntegralPct(d) {
 
   // Series config — Joinville: rede municipal não tem Ensino Médio
   const seriesConfig = JV_MODE ? [
-    { key: 'fundamental', label: 'Fundamental', color: COLORS.fundAI },
+    { key: 'agregado', label: 'Infantil + Fundamental', color: COLORS.pri },
+    { key: 'infantil', label: 'Infantil', color: COLORS.infantil },
+    { key: 'fundamental', label: 'Fundamental', color: COLORS.fundamental },
   ] : [
-    { key: 'agregado', label: 'Fund. + Médio', color: '#003866' },
+    { key: 'agregado', label: 'Inf. + Fund. + Médio', color: COLORS.pri },
+    { key: 'infantil', label: 'Infantil', color: COLORS.infantil },
     { key: 'fundamental', label: 'Fundamental', color: COLORS.fundAI },
     { key: 'medio', label: 'Médio', color: COLORS.medio || '#FF6F00' },
   ];
-  const activeSeries = new Set([JV_MODE ? 'fundamental' : 'agregado']);
+  const activeSeries = new Set(['agregado', 'infantil', 'fundamental']);
 
   // Build filter checkboxes
   filtersEl.innerHTML = seriesConfig.map(s => `
@@ -14417,28 +14422,28 @@ function buildIntegralPct(d) {
     const getIntSrc = (ano) => {
       if (S.munSel) {
         const m = d.por_municipio[ano]?.[S.munSel] || {};
-        return { fund_total: m.int_fund_total || 0, medio: m.int_medio || 0 };
+        return { infantil: m.int_infantil || 0, fund_total: m.int_fund_total || 0, medio: m.int_medio || 0 };
       }
       if (S.creSel) {
         const agg = aggregateCre(d, ano, S.creSel);
-        return { fund_total: agg.int_fund_total || 0, medio: agg.int_medio || 0 };
+        return { infantil: agg.int_infantil || 0, fund_total: agg.int_fund_total || 0, medio: agg.int_medio || 0 };
       }
       const i = d.integral[ano];
-      return i ? { fund_total: i.fund_total || 0, medio: i.medio || 0 } : { fund_total: 0, medio: 0 };
+      return i ? { infantil: i.infantil || 0, fund_total: i.fund_total || 0, medio: i.medio || 0 } : { infantil: 0, fund_total: 0, medio: 0 };
     };
 
     // Helper to get total enrollments
     const getTotalSrc = (ano) => {
       if (S.munSel) {
         const m = d.por_municipio[ano]?.[S.munSel] || {};
-        return { mat_fundamental: m.mat_fundamental || 0, mat_medio: m.mat_medio || 0, mat_total: m.mat_total || 0 };
+        return { mat_infantil: m.mat_infantil || 0, mat_fundamental: m.mat_fundamental || 0, mat_medio: m.mat_medio || 0 };
       }
       if (S.creSel) {
         const agg = aggregateCre(d, ano, S.creSel);
-        return { mat_fundamental: agg.mat_fundamental || 0, mat_medio: agg.mat_medio || 0, mat_total: agg.mat_total || 0 };
+        return { mat_infantil: agg.mat_infantil || 0, mat_fundamental: agg.mat_fundamental || 0, mat_medio: agg.mat_medio || 0 };
       }
       const st = d.serie_temporal[ano] || {};
-      return { mat_fundamental: st.mat_fundamental || 0, mat_medio: st.mat_medio || 0, mat_total: st.mat_total || 0 };
+      return { mat_infantil: st.mat_infantil || 0, mat_fundamental: st.mat_fundamental || 0, mat_medio: st.mat_medio || 0 };
     };
 
     const datasets = seriesConfig.map(s => {
@@ -14446,9 +14451,11 @@ function buildIntegralPct(d) {
         const intSrc = getIntSrc(ano);
         const totalSrc = getTotalSrc(ano);
         if (s.key === 'agregado') {
-          const intTotal = intSrc.fund_total + intSrc.medio;
-          const matTotal = totalSrc.mat_fundamental + totalSrc.mat_medio;
+          const intTotal = intSrc.infantil + intSrc.fund_total + intSrc.medio;
+          const matTotal = totalSrc.mat_infantil + totalSrc.mat_fundamental + totalSrc.mat_medio;
           return matTotal > 0 ? parseFloat(((intTotal / matTotal) * 100).toFixed(1)) : 0;
+        } else if (s.key === 'infantil') {
+          return totalSrc.mat_infantil > 0 ? parseFloat(((intSrc.infantil / totalSrc.mat_infantil) * 100).toFixed(1)) : 0;
         } else if (s.key === 'fundamental') {
           return totalSrc.mat_fundamental > 0 ? parseFloat(((intSrc.fund_total / totalSrc.mat_fundamental) * 100).toFixed(1)) : 0;
         } else {
